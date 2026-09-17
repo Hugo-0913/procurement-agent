@@ -7,3 +7,4 @@ workspace/
 eval_results/
 .pytest_cache/
 *.egg-info/
+*.log
