@@ -59,3 +59,20 @@ def test_threshold_comes_from_config():
     decision = PolicyEngine(strict).check_order(make_draft(200.0))
     assert decision.requires_approval is True
 
+
+def test_insufficient_quotes_requires_approval():
+    """只剩一家可用报价时不能静默下单，必须转人工确认。"""
+    draft = OrderDraft(
+        task_id="t-1",
+        supplier_id=1,
+        material_id=1,
+        quantity=50,
+        unit_price=21.5,
+        total_amount=1075.0,
+        lead_days=3,
+        cost_center="CC-1001",
+        insufficient_quotes=True,
+    )
+    decision = PolicyEngine(CFG).check_order(draft)
+    assert decision.requires_approval is True
+    assert any("报价不足" in rule for rule in decision.matched_rules)

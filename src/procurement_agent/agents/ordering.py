@@ -26,6 +26,7 @@ class OrderDraft:
     supplier_expiring_soon: bool = False
     price_gap_ratio: float = 0.0
     supplier_name: str = ""
+    insufficient_quotes: bool = False
 
 
 def run_ordering(
@@ -70,5 +71,6 @@ def run_ordering(
         supplier_expiring_soon=recommended.expiring_soon,
         price_gap_ratio=max(price_gap_ratio, 0.0),
         supplier_name=recommended.name,
+        insufficient_quotes=bool(sourcing.insufficient_quotes),
     )
     return draft, policy.check_order(draft)

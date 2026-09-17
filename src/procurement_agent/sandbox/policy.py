@@ -12,6 +12,7 @@ class OrderDraftLike(Protocol):
     total_amount: float
     supplier_expiring_soon: bool
     price_gap_ratio: float
+    insufficient_quotes: bool
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,8 @@ class PolicyEngine:
             matched.append(
                 f"推荐结果非最低价，差额比例 {draft.price_gap_ratio:.1%} 超过 10%"
             )
+        if draft.insufficient_quotes:
+            matched.append("可用报价不足，无法完成比价，需人工确认")
 
         if not matched:
             return PolicyDecision(allowed=True, requires_approval=False)
@@ -51,4 +54,3 @@ class PolicyEngine:
             matched_rules=tuple(matched),
             reason="；".join(matched),
         )
-

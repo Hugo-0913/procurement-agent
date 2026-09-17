@@ -343,7 +343,10 @@ def build_handlers(deps: CoordinatorDeps):
     def ordering(task_id: str, context: dict[str, Any]) -> StageResult:
         target = agents.subagents["ordering"].name
         draft = payload_to_draft(context["draft"])
-        if context.get("sourcing", {}).get("insufficient_quotes"):
+        if (
+            context.get("sourcing", {}).get("insufficient_quotes")
+            and deps.config.single_quote_policy == "fail"
+        ):
             raise InsufficientQuotesError()
         order_id = deps.repo.create_order(draft)
         deps.repo.record_price(draft.supplier_id, draft.material_id, draft.unit_price)

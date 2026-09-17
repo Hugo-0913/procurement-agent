@@ -24,6 +24,10 @@ class ProcurementConfig:
     context_token_threshold: int
     min_quote_count: int
     freshness_warn_days: int
+    # 可用报价不足 min_quote_count 时的处置策略：
+    #   approval —— 以唯一报价继续，但必须转人工审批（默认，业务更合理）
+    #   fail     —— 直接判定任务失败
+    single_quote_policy: str = "approval"
 
 
 def load_env(path: Path | None = None) -> bool:
@@ -43,4 +47,9 @@ def load_procurement_config(path: Path | None = None) -> ProcurementConfig:
     missing = [field for field in REQUIRED_FIELDS if field not in raw]
     if missing:
         raise ValueError(f"缺少必需配置项: {', '.join(missing)}")
-    return ProcurementConfig(**{field: raw[field] for field in REQUIRED_FIELDS})
+    policy = str(raw.get("single_quote_policy", "approval"))
+    if policy not in {"approval", "fail"}:
+        raise ValueError("single_quote_policy 只能是 approval 或 fail")
+    return ProcurementConfig(
+        **{field: raw[field] for field in REQUIRED_FIELDS}, single_quote_policy=policy
+    )

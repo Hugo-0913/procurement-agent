@@ -32,4 +32,19 @@ def test_default_config_file_loads():
     cfg = load_procurement_config()
     assert cfg.approval_threshold == 50000
     assert cfg.min_quote_count == 2
+    assert cfg.single_quote_policy == "approval"
 
+
+def test_invalid_single_quote_policy_rejected(tmp_path: Path):
+    cfg_file = tmp_path / "procurement.yaml"
+    cfg_file.write_text(
+        "approval_threshold: 1\n"
+        "retry_max_attempts: 1\n"
+        "context_token_threshold: 1\n"
+        "min_quote_count: 1\n"
+        "freshness_warn_days: 1\n"
+        "single_quote_policy: whatever\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="single_quote_policy"):
+        load_procurement_config(cfg_file)
