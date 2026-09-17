@@ -53,3 +53,25 @@ def test_single_viable_supplier_escalates_instead_of_failing(hard_report):
     failed = {item["case_id"] for item in report.failures}
     assert "H-10" not in failed, "唯一可用报价场景未按审批策略处理"
     assert report.intervention_count >= 2
+
+
+def test_urgent_deadline_escalates_for_lead_time_reason(tmp_path_factory):
+    """H-06 的"明天必须到货"应因交期不可行而转人工，而不是只靠金额触发。"""
+    import json
+    from pathlib import Path
+
+    cases = [c for c in load_cases(HARD_CASES) if c.id == "H-06"]
+    workspace = tmp_path_factory.mktemp("urgent")
+    run_eval(cases, workspace)
+
+    import sqlite3
+
+    db = Path(workspace) / "H-06" / "erp.db"
+    con = sqlite3.connect(db)
+    con.row_factory = sqlite3.Row
+    rows = con.execute(
+        "SELECT payload FROM task_events WHERE event_type = 'approval_requested'"
+    ).fetchall()
+    con.close()
+    rules = json.loads(rows[-1]["payload"])["matched_rules"]
+    assert any("交期" in rule for rule in rules)

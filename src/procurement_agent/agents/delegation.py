@@ -161,6 +161,7 @@ def quote_query() -> str:
         int(context.state["material_id"]),
         int(context.state["quantity"]),
         qualified,
+        expected_date=context.state.get("expected_date"),
     )
     context.results["sourcing"] = outcome
     payload = sourcing_to_payload(outcome)

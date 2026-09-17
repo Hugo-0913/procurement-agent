@@ -72,6 +72,8 @@ docs/              架构、安全、决策记录、演示脚本
 
 详细分镜与讲解要点见 [docs/demo-script.md](docs/demo-script.md)。
 
+**要自己动手操作，看 [docs/operation-guide.md](docs/operation-guide.md)**：启动停止、四个页面能做什么、六个演示场景的具体操作、出错排查、面试追问速查。
+
 ## 评测
 
 ```bash

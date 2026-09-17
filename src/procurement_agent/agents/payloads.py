@@ -33,6 +33,8 @@ def sourcing_to_payload(outcome: SourcingOutcome) -> dict:
         "recommended": asdict(outcome.recommended) if outcome.recommended else None,
         "reason": outcome.reason,
         "insufficient_quotes": outcome.insufficient_quotes,
+        "available_days": outcome.available_days,
+        "deadline_feasible": outcome.deadline_feasible,
     }
 
 
@@ -43,6 +45,8 @@ def sourcing_from_payload(data: dict) -> SourcingOutcome:
         recommended=QuoteComparison(**recommended) if recommended else None,
         reason=data.get("reason", ""),
         insufficient_quotes=bool(data.get("insufficient_quotes", False)),
+        available_days=data.get("available_days"),
+        deadline_feasible=bool(data.get("deadline_feasible", True)),
     )
 
 
@@ -52,4 +56,3 @@ def draft_to_payload(draft: OrderDraft) -> dict:
 
 def payload_to_draft(data: dict) -> OrderDraft:
     return OrderDraft(**data)
-

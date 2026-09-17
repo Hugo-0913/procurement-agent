@@ -249,6 +249,7 @@ def build_handlers(deps: CoordinatorDeps):
                 "material_name": material.name,
                 "quantity": int(parsed["quantity"]),
                 "cost_center": parsed.get("cost_center") or "CC-1001",
+                "expected_date": parsed.get("expected_date"),
                 "loaded_skills": sorted(loaded),
             },
         )

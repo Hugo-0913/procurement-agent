@@ -76,3 +76,21 @@ def test_insufficient_quotes_requires_approval():
     decision = PolicyEngine(CFG).check_order(draft)
     assert decision.requires_approval is True
     assert any("报价不足" in rule for rule in decision.matched_rules)
+
+
+def test_infeasible_deadline_requires_approval():
+    """交期无法满足期望到货日期时必须转人工，不能静默下单。"""
+    draft = OrderDraft(
+        task_id="t-1",
+        supplier_id=1,
+        material_id=1,
+        quantity=50,
+        unit_price=21.5,
+        total_amount=1075.0,
+        lead_days=3,
+        cost_center="CC-1001",
+        deadline_infeasible=True,
+    )
+    decision = PolicyEngine(CFG).check_order(draft)
+    assert decision.requires_approval is True
+    assert any("交期" in rule for rule in decision.matched_rules)

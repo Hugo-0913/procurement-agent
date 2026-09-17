@@ -64,3 +64,50 @@ def test_skill_loaded_when_registry_passed(env):
     )
     assert registry.loaded_names == {"price_comparison"}
 
+
+def test_lead_time_met_when_deadline_is_comfortable(env):
+    from datetime import date, timedelta
+
+    qualified = run_qualification(env.repo, env.config, env.material.id)
+    deadline = (date.today() + timedelta(days=4)).isoformat()
+    outcome = run_sourcing(
+        env.repo, env.config, env.material.id, QUANTITY, qualified, expected_date=deadline
+    )
+    assert outcome.available_days == 4
+    assert outcome.deadline_feasible is True
+    assert outcome.recommended.on_time is True
+
+
+def test_cheapest_excluded_when_lead_time_too_long(env):
+    """最低价供应商交期不满足时，应改选能按时到货的供应商并说明原因。"""
+    from datetime import date, timedelta
+
+    qualified = run_qualification(env.repo, env.config, env.material.id)
+    deadline = (date.today() + timedelta(days=3)).isoformat()
+    outcome = run_sourcing(
+        env.repo, env.config, env.material.id, QUANTITY, qualified, expected_date=deadline
+    )
+    fastest = min(outcome.comparisons, key=lambda item: item.lead_days)
+    assert fastest.lead_days == 2
+    # 交期 5 天的供应商被排除
+    assert outcome.recommended.lead_days <= 3
+    assert outcome.deadline_feasible is True
+
+
+def test_infeasible_deadline_is_flagged(env):
+    from datetime import date, timedelta
+
+    qualified = run_qualification(env.repo, env.config, env.material.id)
+    deadline = (date.today() + timedelta(days=1)).isoformat()
+    outcome = run_sourcing(
+        env.repo, env.config, env.material.id, QUANTITY, qualified, expected_date=deadline
+    )
+    assert outcome.deadline_feasible is False
+    assert "交期" in outcome.reason
+    assert "无法满足" in outcome.reason
+
+
+def test_no_deadline_means_no_lead_time_check(env):
+    outcome = prepare(env)
+    assert outcome.available_days is None
+    assert outcome.deadline_feasible is True

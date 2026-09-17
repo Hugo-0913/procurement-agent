@@ -13,6 +13,7 @@ class OrderDraftLike(Protocol):
     supplier_expiring_soon: bool
     price_gap_ratio: float
     insufficient_quotes: bool
+    deadline_infeasible: bool
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,8 @@ class PolicyEngine:
             )
         if draft.insufficient_quotes:
             matched.append("可用报价不足，无法完成比价，需人工确认")
+        if draft.deadline_infeasible:
+            matched.append("交期无法满足期望到货日期，需人工确认")
 
         if not matched:
             return PolicyDecision(allowed=True, requires_approval=False)

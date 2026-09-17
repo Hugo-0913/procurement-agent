@@ -27,6 +27,7 @@ class OrderDraft:
     price_gap_ratio: float = 0.0
     supplier_name: str = ""
     insufficient_quotes: bool = False
+    deadline_infeasible: bool = False
 
 
 def run_ordering(
@@ -72,5 +73,6 @@ def run_ordering(
         price_gap_ratio=max(price_gap_ratio, 0.0),
         supplier_name=recommended.name,
         insufficient_quotes=bool(sourcing.insufficient_quotes),
+        deadline_infeasible=not sourcing.deadline_feasible,
     )
     return draft, policy.check_order(draft)
