@@ -105,6 +105,11 @@ def build_stage_graph(
             return "order_drafting"
         return "ordering"
 
+    def route_after_parsing(state: PipelineState) -> str:
+        if state.get("context", {}).get("needs_clarification"):
+            return "end"
+        return "qualifying"
+
     def finish(state: PipelineState) -> dict[str, Any]:
         task_id = state["task_id"]
         store.transition(task_id, TaskState.COMPLETED)
@@ -127,7 +132,9 @@ def build_stage_graph(
     graph.add_node("finish", finish)
 
     graph.add_edge(START, "parsing")
-    graph.add_edge("parsing", "qualifying")
+    graph.add_conditional_edges(
+        "parsing", route_after_parsing, {"qualifying": "qualifying", "end": END}
+    )
     graph.add_edge("qualifying", "sourcing")
     graph.add_edge("sourcing", "order_drafting")
     graph.add_edge("order_drafting", "approval_gate")
