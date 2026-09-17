@@ -5,6 +5,8 @@ function renderReport(report) {
     ["人工介入率", ((report.intervention_rate ?? 0) * 100).toFixed(1) + "%"],
     ["平均耗时", (report.avg_duration_ms ?? 0) + " ms"],
     ["上下文 token 峰值", report.token_peak ?? 0],
+    ["每任务 token 总量", report.token_total_mean ?? 0],
+    ["框架委派 / 降级", `${report.delegation_framework ?? 0} / ${report.delegation_fallback ?? 0}`],
     ["上下文压缩率", ((report.context_reduction_rate ?? 0) * 100).toFixed(1) + "%"],
   ];
   document.getElementById("eval-metrics").innerHTML = metrics

@@ -195,6 +195,28 @@ def test_fallback_when_model_refuses_to_delegate(tmp_path):
     assert all("reason" in e.payload for e in results)
 
 
+def test_each_task_records_its_own_skill_events(tmp_path):
+    """技能加载状态按任务记录：第二个任务不能因为进程内已加载过就漏发事件。"""
+    _, store, _, runner = build_runner(tmp_path, [parse_response(), parse_response()])
+    first = runner.start(DEFAULT_REQUEST)
+    second = runner.start(DEFAULT_REQUEST)
+
+    def loaded(task_id):
+        return [
+            e.payload["skill"]
+            for e in store.list_events(task_id)
+            if e.event_type == "skill_loaded"
+        ]
+
+    assert loaded(first) == loaded(second)
+    assert loaded(second) == [
+        "requirement_parsing",
+        "supplier_qualification",
+        "price_comparison",
+        "order_compliance",
+    ]
+
+
 def test_invalid_json_from_model_marks_task_failed(tmp_path):
     """模型持续返回非法 JSON：按可重试错误重试，耗尽后任务失败并保留重试记录。"""
     _, store, _, runner = build_runner(tmp_path, ["这不是 JSON"] * 5)

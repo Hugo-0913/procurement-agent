@@ -1,6 +1,10 @@
 const EVENT_LABELS = {
   stage_change: (p) => `阶段切换 ${p.from} → ${p.to}`,
   agent_delegation: (p) => `委派给 ${p.to}`,
+  delegation_result: (p) =>
+    p.mode === "framework"
+      ? `框架委派成功：${p.to}`
+      : `未委派，降级为直接执行：${p.to}${p.reason ? "（" + p.reason + "）" : ""}`,
   tool_call: (p) => `调用 ${p.tool}`,
   tool_result: (p) => `${p.tool}: ${p.summary || "完成"}`,
   skill_loaded: (p) => `已加载技能 ${p.skill}`,
@@ -105,4 +109,3 @@ function renderStep(step) {
       <span class="hint">${step.detail[step.detail.length - 1] || ""}</span>
     </div>`;
 }
-

@@ -1,4 +1,4 @@
-const MIDDLEWARE_AGENTS = new Set(["context_summarizer", "policy_engine", "policy_guard", "human"]);
+const MIDDLEWARE_AGENTS = new Set(["context_summarizer", "policy_engine", "policy_guard"]);
 
 function renderTimeline(events) {
   const root = document.getElementById("timeline");
@@ -55,4 +55,3 @@ function fillFilters(events) {
   agentSelect.value = agents.includes(keepAgent) ? keepAgent : "";
   typeSelect.value = types.includes(keepType) ? keepType : "";
 }
-

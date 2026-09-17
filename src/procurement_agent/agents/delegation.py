@@ -90,6 +90,7 @@ class TaskContext:
     skills: SkillRegistry
     state: dict[str, Any] = field(default_factory=dict)
     results: dict[str, Any] = field(default_factory=dict)
+    loaded_skills: set[str] = field(default_factory=set)
 
 
 CURRENT_TASK: ContextVar[TaskContext | None] = ContextVar(
@@ -105,9 +106,15 @@ def _ctx() -> TaskContext:
 
 
 def _load_skill(context: TaskContext, agent: str, name: str) -> None:
-    if name in context.skills.loaded_names:
+    """按任务维度记录技能加载。
+
+    不能用注册表的进程级 ``loaded_names`` 判断：并发跑多个任务时，第二个任务会因为
+    技能"已在进程内加载过"而漏发 skill_loaded 事件，页面就会把它显示成"仅描述"。
+    """
+    if name in context.loaded_skills:
         return
     context.skills.load(name)
+    context.loaded_skills.add(name)
     context.store.append_event(
         context.task_id, agent, "skill_loaded", {"skill": name}
     )

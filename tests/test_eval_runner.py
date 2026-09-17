@@ -111,3 +111,20 @@ def test_report_includes_context_metrics(tmp_path):
     assert report.context_before_tokens > 0
     assert report.context_after_tokens > 0
     assert report.context_reduction_rate > 0
+
+
+def test_report_counts_delegation_modes(tmp_path):
+    """报告必须区分框架委派与降级，不能把降级算成委派成功。"""
+    cases = small_cases(tmp_path / "small.yaml")
+    report = run_eval(cases, tmp_path / "runs")
+    # 三条用例各三次委派，离线模型始终发出 task 工具调用
+    assert report.delegation_framework == 9
+    assert report.delegation_fallback == 0
+
+
+def test_offline_mode_records_no_fake_token_totals(tmp_path):
+    """离线模型没有真实用量，token 总量必须为 0，不能拿估算值冒充。"""
+    cases = small_cases(tmp_path / "small.yaml")
+    report = run_eval(cases, tmp_path / "runs")
+    assert report.token_total_mean == 0
+    assert report.token_total_max == 0

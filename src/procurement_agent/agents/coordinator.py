@@ -67,8 +67,7 @@ def _event(deps: CoordinatorDeps, task_id: str, agent: str, kind: str, payload: 
 
 
 def _load_skill(deps: CoordinatorDeps, task_id: str, agent: str, name: str) -> None:
-    if name in deps.skills.loaded_names:
-        return
+    """加载技能并记录事件。调用方需自行保证同一任务内不重复。"""
     deps.skills.load(name)
     _event(deps, task_id, agent, "skill_loaded", {"skill": name})
 
@@ -153,6 +152,7 @@ def build_handlers(deps: CoordinatorDeps):
             policy=deps.policy,
             skills=deps.skills,
             state=dict(context),
+            loaded_skills=set(context.get("loaded_skills", [])),
         )
         _delegate(deps, task_id, subagent)
         mode = "fallback"
@@ -182,7 +182,10 @@ def build_handlers(deps: CoordinatorDeps):
         if deps.memory is not None:
             block = deps.memory.render_prompt_block()
             _event(deps, task_id, "coordinator", "memory_loaded", {"summary": block})
-        _load_skill(deps, task_id, "coordinator", "requirement_parsing")
+        loaded = set(context.get("loaded_skills", []))
+        if "requirement_parsing" not in loaded:
+            _load_skill(deps, task_id, "coordinator", "requirement_parsing")
+            loaded.add("requirement_parsing")
 
         record = deps.store.get_task(task_id)
         model = deps.model_factory()
@@ -246,6 +249,7 @@ def build_handlers(deps: CoordinatorDeps):
                 "material_name": material.name,
                 "quantity": int(parsed["quantity"]),
                 "cost_center": parsed.get("cost_center") or "CC-1001",
+                "loaded_skills": sorted(loaded),
             },
         )
 
@@ -261,7 +265,10 @@ def build_handlers(deps: CoordinatorDeps):
         outcome = task_context.results["qualification"]
         result = StageResult(
             state=TaskState.QUALIFYING,
-            payload={"qualification": qualification_to_payload(outcome)},
+            payload={
+                "qualification": qualification_to_payload(outcome),
+                "loaded_skills": sorted(task_context.loaded_skills),
+            },
         )
         result.payload.update(
             _track_context(
@@ -285,7 +292,11 @@ def build_handlers(deps: CoordinatorDeps):
         )
         outcome = task_context.results["sourcing"]
         result = StageResult(
-            state=TaskState.SOURCING, payload={"sourcing": sourcing_to_payload(outcome)}
+            state=TaskState.SOURCING,
+            payload={
+                "sourcing": sourcing_to_payload(outcome),
+                "loaded_skills": sorted(task_context.loaded_skills),
+            },
         )
         result.payload.update(
             _track_context(
@@ -315,6 +326,7 @@ def build_handlers(deps: CoordinatorDeps):
                 "draft": draft_to_payload(draft),
                 "needs_approval": decision.requires_approval,
                 "matched_rules": list(decision.matched_rules),
+                "loaded_skills": sorted(task_context.loaded_skills),
             },
         )
         result.payload.update(

@@ -51,6 +51,10 @@ class EvalReport:
     avg_duration_ms: float = 0.0
     token_peak: int = 0
     token_mean: float = 0.0
+    token_total_mean: float = 0.0
+    token_total_max: int = 0
+    delegation_framework: int = 0
+    delegation_fallback: int = 0
     context_reduction_rate: float = 0.0
     context_before_tokens: int = 0
     context_after_tokens: int = 0
@@ -174,9 +178,13 @@ def _run_single_case(
     started = time.perf_counter()
     task_id = runner.start(case.request_text)
     record = store.get_task(task_id)
-    approval_requested = any(
-        event.event_type == "approval_requested" for event in store.list_events(task_id)
-    )
+    events = store.list_events(task_id)
+    approval_requested = any(event.event_type == "approval_requested" for event in events)
+    delegation_modes = [
+        event.payload.get("mode")
+        for event in events
+        if event.event_type == "delegation_result"
+    ]
     if record.state is TaskState.AWAITING_APPROVAL and case.expect_state == "AWAITING_APPROVAL":
         pass
     duration_ms = round((time.perf_counter() - started) * 1000, 2)
@@ -190,6 +198,9 @@ def _run_single_case(
         "approval_requested": approval_requested,
         "duration_ms": duration_ms,
         "token_peak": int(record.token_usage.get("peak", 0)),
+        "token_total": int(record.token_usage.get("total", 0)),
+        "delegation_framework": sum(1 for mode in delegation_modes if mode == "framework"),
+        "delegation_fallback": sum(1 for mode in delegation_modes if mode == "fallback"),
         "success": record.state.value == case.expect_state
         and approval_requested == case.expect_approval,
     }
@@ -215,6 +226,11 @@ def run_eval(
     report.avg_duration_ms = metrics.average_duration([item["duration_ms"] for item in results])
     report.token_peak = metrics.token_peak([item["token_peak"] for item in results])
     report.token_mean = metrics.token_mean([item["token_peak"] for item in results])
+    totals = [item["token_total"] for item in results]
+    report.token_total_mean = round(metrics.average_duration(totals), 2)
+    report.token_total_max = max(totals) if totals else 0
+    report.delegation_framework = sum(item["delegation_framework"] for item in results)
+    report.delegation_fallback = sum(item["delegation_fallback"] for item in results)
     before, after, reduction = measure_context_reduction(cfg)
     report.context_before_tokens = before
     report.context_after_tokens = after
