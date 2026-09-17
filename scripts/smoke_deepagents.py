@@ -21,6 +21,10 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from procurement_agent.config import load_env  # noqa: E402
+
+load_env(REPO_ROOT / ".env")
+
 
 def _print_versions() -> None:
     import importlib.metadata as md

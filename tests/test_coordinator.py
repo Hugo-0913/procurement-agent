@@ -158,11 +158,14 @@ def test_structured_request_saved(tmp_path):
 
 
 def test_invalid_json_from_model_marks_task_failed(tmp_path):
-    _, store, _, runner = build_runner(tmp_path, ["这不是 JSON"])
+    """模型持续返回非法 JSON：按可重试错误重试，耗尽后任务失败并保留重试记录。"""
+    _, store, _, runner = build_runner(tmp_path, ["这不是 JSON"] * 5)
     task_id = runner.start(DEFAULT_REQUEST)
 
     record = store.get_task(task_id)
     assert record.state is TaskState.FAILED
     errors = [e for e in store.list_events(task_id) if e.event_type == "error"]
-    assert errors and errors[0].payload["error"] == "JSONDecodeError"
-
+    assert errors and errors[0].payload["error"] == "RetryExhausted"
+    retries = [e for e in store.list_events(task_id) if e.event_type == "retry"]
+    assert len(retries) == CONFIG.retry_max_attempts - 1
+    assert all(e.payload["reason"] == "JSONDecodeError" for e in retries)

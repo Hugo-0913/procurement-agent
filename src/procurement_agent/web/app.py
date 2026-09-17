@@ -12,7 +12,7 @@ from procurement_agent.agents.config import load_agents_config
 from procurement_agent.agents.coordinator import CoordinatorDeps, build_handlers
 from procurement_agent.agents.model import build_chat_model
 from procurement_agent.agents.offline import offline_model_factory
-from procurement_agent.config import load_procurement_config
+from procurement_agent.config import load_env, load_procurement_config
 from procurement_agent.db.models import init_db, seed_demo_data
 from procurement_agent.erp.faults import FaultRegistry
 from procurement_agent.erp.repository import ErpRepository
@@ -47,6 +47,7 @@ def create_app(
     ``offline=None``（默认）表示自动判断：未配置 ``DEEPSEEK_API_KEY`` 时使用内置离线
     模型，保证没有 API key 也能完整跑通演示；显式传 ``False`` 则强制使用真实模型。
     """
+    load_env()
     if offline is None:
         offline = not os.environ.get("DEEPSEEK_API_KEY")
         if offline:

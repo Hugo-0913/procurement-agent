@@ -62,7 +62,9 @@ class ContextSummarizer:
                 ),
             },
         ]
-        return str(model.invoke(payload))
+        from procurement_agent.agents.response import response_text
+
+        return response_text(model.invoke(payload))
 
     def maybe_summarize(
         self, messages: list[dict[str, Any]], essential: dict[str, Any]
@@ -104,4 +106,3 @@ class ContextSummarizer:
             dropped_categories=tuple(dict.fromkeys(dropped)),
             summary=summary,
         )
-

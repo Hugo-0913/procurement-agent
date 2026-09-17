@@ -142,6 +142,7 @@ def _run_single_case(
     case: EvalCase,
     workspace: Path,
     config: ProcurementConfig,
+    model_factory=None,
 ) -> dict[str, Any]:
     case_dir = workspace / case.id
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -154,8 +155,8 @@ def _run_single_case(
     repo = ErpRepository(engine, faults)
     store = TaskStore(engine)
     skills = SkillRegistry()
-    # 不传固定脚本：让评测真正走一遍规则解析器，而不是复用预先给定的解析结果
-    model_factory = offline_model_factory()
+    # 默认不传固定脚本：让评测真正走一遍规则解析器，而不是复用预先给定的解析结果
+    factory = model_factory or offline_model_factory()
     deps = CoordinatorDeps(
         repo=repo,
         store=store,
@@ -163,9 +164,9 @@ def _run_single_case(
         agents_config=load_agents_config(),
         skills=skills,
         policy=PolicyEngine(config),
-        model_factory=model_factory,
+        model_factory=factory,
         memory=MemoryStore(engine, config),
-        summarizer=ContextSummarizer(config, model_factory),
+        summarizer=ContextSummarizer(config, factory),
     )
     graph = build_stage_graph(store, build_handlers(deps), config)
     runner = TaskRunner(store, graph)
@@ -198,11 +199,12 @@ def run_eval(
     cases: list[EvalCase],
     workspace: Path,
     config: ProcurementConfig | None = None,
+    model_factory=None,
 ) -> EvalReport:
     cfg = config or load_procurement_config()
     workspace = Path(workspace)
     workspace.mkdir(parents=True, exist_ok=True)
-    results = [_run_single_case(case, workspace, cfg) for case in cases]
+    results = [_run_single_case(case, workspace, cfg, model_factory) for case in cases]
 
     report = EvalReport(status="finished", total=len(results))
     report.success_count = sum(1 for item in results if item["success"])
@@ -270,10 +272,26 @@ def main() -> int:
     parser.add_argument("--cases", default=str(DEFAULT_CASES_PATH))
     parser.add_argument("--out", default=str(DEFAULT_RESULT_PATH))
     parser.add_argument("--workspace", default="eval_results/runs")
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="使用真实 DeepSeek 模型评测（需要 DEEPSEEK_API_KEY，会产生费用与网络时延）",
+    )
+    parser.add_argument("--limit", type=int, default=0, help="只跑前 N 条用例，0 表示全部")
     args = parser.parse_args()
 
     cases = load_cases(Path(args.cases))
-    report = run_eval(cases, Path(args.workspace))
+    if args.limit > 0:
+        cases = cases[: args.limit]
+
+    factory = None
+    if args.live:
+        from procurement_agent.agents.model import build_chat_model
+
+        factory = build_chat_model
+        print(f"[真实模型模式] 用例数 = {len(cases)}")
+
+    report = run_eval(cases, Path(args.workspace), model_factory=factory)
     output = Path(args.out)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(

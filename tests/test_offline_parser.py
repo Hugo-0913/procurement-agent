@@ -1,4 +1,5 @@
 from procurement_agent.agents.offline import OfflineModel, parse_request_text
+from procurement_agent.agents.response import response_text
 
 
 def test_parses_quantity_material_and_cost_center():
@@ -35,14 +36,14 @@ def test_vague_request_has_no_quantity():
 def test_model_returns_json_for_parse_prompt():
     model = OfflineModel(default_response=None)
     prompt = "字段要求：material_name\n采购需求：采购 3000 箱 A4 纸"
-    payload = model.invoke([{"role": "user", "content": prompt}])
+    payload = response_text(model.invoke([{"role": "user", "content": prompt}]))
     assert '"quantity": 3000' in payload
 
 
 def test_model_returns_summary_for_summary_prompt():
     model = OfflineModel(default_response=None)
-    payload = model.invoke(
-        [{"role": "user", "content": "请把以下对话压缩为不超过 3 行的中文摘要"}]
+    payload = response_text(
+        model.invoke([{"role": "user", "content": "请把以下对话压缩为不超过 3 行的中文摘要"}])
     )
     assert "推荐" in payload
     assert "quantity" not in payload
@@ -50,6 +51,5 @@ def test_model_returns_summary_for_summary_prompt():
 
 def test_explicit_response_still_honoured():
     model = OfflineModel(default_response='{"material_name": "X", "quantity": 1}')
-    payload = model.invoke([{"role": "user", "content": "采购需求：随便"}])
+    payload = response_text(model.invoke([{"role": "user", "content": "采购需求：随便"}]))
     assert payload == '{"material_name": "X", "quantity": 1}'
-

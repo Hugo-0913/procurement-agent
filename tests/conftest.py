@@ -20,6 +20,14 @@ TEST_CONFIG = ProcurementConfig(
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_env_file(monkeypatch):
+    """测试不允许读取开发者的 .env，避免本地密钥或配置影响断言。"""
+    noop = lambda *args, **kwargs: False  # noqa: E731
+    monkeypatch.setattr("procurement_agent.config.load_env", noop)
+    monkeypatch.setattr("procurement_agent.web.app.load_env", noop)
+
+
 def build_env(tmp_path: Path) -> SimpleNamespace:
     engine = init_db(tmp_path / "erp.db")
     seed_demo_data(engine)
@@ -108,4 +116,3 @@ async def wait_for_state(client, task_id: str, targets, timeout: float = 15.0):
             return detail
         await asyncio.sleep(0.1)
     return detail
-

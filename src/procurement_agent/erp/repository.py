@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, timedelta
+import re
 from typing import Any, Mapping
 
 from sqlalchemy import func, select
@@ -27,6 +28,25 @@ EXPIRED_SUPPLIER_CODES = {"SUP-B"}
 NO_QUOTE_SUPPLIER_CODES = {"SUP-C"}
 
 
+def _normalize_name(text: Any) -> str:
+    """归一化物料名称：去掉所有空白（含全角空格）并转小写。
+
+    真实模型经常把"A4 纸"写成"A4纸"或"A4复印纸"，直接用 LIKE 匹配会失配，
+    导致流程反复向用户澄清。这里做归一化 + 关键词包含匹配。
+    """
+    return re.sub(r"\s+", "", str(text or "")).lower()
+
+
+def _keywords(raw_name: Any) -> list[str]:
+    """按空格与标点切分关键词，再各自归一化。
+
+    必须在去空格之前切分：先删空格会把"A4 纸"压成单个词"a4纸"，
+    导致"a4复印纸"这类别名匹配不上。
+    """
+    parts = re.split(r"[^0-9A-Za-z\u4e00-\u9fff]+", str(raw_name or "").lower())
+    return [part for part in parts if part]
+
+
 def _as_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, Mapping):
         return dict(value)
@@ -46,10 +66,25 @@ class ErpRepository:
         return bool(self.faults and self.faults.is_enabled(name))
 
     def find_material_by_name(self, name: str) -> Material | None:
+        target = _normalize_name(name)
+        if not target:
+            return None
         with Session(self.engine) as session:
-            return session.scalar(
-                select(Material).where(Material.name.like(f"%{name}%")).limit(1)
-            )
+            materials = list(session.scalars(select(Material)))
+            for material in materials:
+                normalized = _normalize_name(material.name)
+                if normalized == target or _normalize_name(material.sku) == target:
+                    return material
+            # 关键词全覆盖：模型返回"A4复印纸"时，主数据的"A4"与"纸"都能命中
+            best: Material | None = None
+            best_score = 0
+            for material in materials:
+                keys = _keywords(material.name)
+                if keys and all(key in target for key in keys):
+                    score = sum(len(key) for key in keys)
+                    if score > best_score:
+                        best, best_score = material, score
+            return best
 
     def get_material(self, material_id: int) -> Material | None:
         with Session(self.engine) as session:
@@ -168,4 +203,3 @@ class ErpRepository:
                 )
             )
             session.commit()
-

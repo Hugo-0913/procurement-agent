@@ -18,7 +18,25 @@ CORRECTIVE_ACTIONS: dict[str, str] = {
     "TimeoutError": "缩短查询范围后重试",
     "ConnectionError": "等待 1 秒后重连重试",
     "JSONDecodeError": "要求模型按 JSON schema 重新输出",
+    "APIConnectionError": "等待 1 秒后重连模型接口",
+    "APITimeoutError": "缩短提示词后重试模型调用",
+    "RateLimitError": "退避后重试模型调用",
+    "InternalServerError": "等待服务端恢复后重试",
 }
+
+# 第三方 SDK（openai / anthropic 等）的连接类异常无法直接 import 判断，
+# 因此按类名匹配，并沿 MRO 向上查找父类名。
+RETRYABLE_ERROR_NAMES = frozenset(
+    {
+        "APIConnectionError",
+        "APITimeoutError",
+        "RateLimitError",
+        "InternalServerError",
+        "ConnectError",
+        "ReadTimeout",
+        "RemoteProtocolError",
+    }
+)
 
 
 class RetryExhausted(Exception):
@@ -36,7 +54,11 @@ class RetryEvent:
 
 
 def classify_error(exc: BaseException) -> Literal["retryable", "fatal"]:
-    return "retryable" if isinstance(exc, RETRYABLE_ERRORS) else "fatal"
+    if isinstance(exc, RETRYABLE_ERRORS):
+        return "retryable"
+    if any(cls.__name__ in RETRYABLE_ERROR_NAMES for cls in type(exc).__mro__):
+        return "retryable"
+    return "fatal"
 
 
 def run_with_retry(
@@ -61,10 +83,20 @@ def run_with_retry(
             if attempt >= max_attempts:
                 break
             name = type(exc).__name__
+            action = CORRECTIVE_ACTIONS.get(name)
+            if action is None:
+                action = next(
+                    (
+                        CORRECTIVE_ACTIONS[cls.__name__]
+                        for cls in type(exc).__mro__
+                        if cls.__name__ in CORRECTIVE_ACTIONS
+                    ),
+                    "修正参数后重试",
+                )
             event = RetryEvent(
                 attempt=attempt,
                 reason=name,
-                corrective_action=CORRECTIVE_ACTIONS.get(name, "修正参数后重试"),
+                corrective_action=action,
             )
             if on_retry is not None:
                 on_retry(event)
@@ -80,4 +112,3 @@ def run_with_retry(
             )
     assert last_error is not None
     raise RetryExhausted(attempts=max_attempts, last_error=last_error)
-

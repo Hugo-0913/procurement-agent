@@ -33,14 +33,18 @@ class OfflineModel:
         self.calls: list[Any] = []
 
     def invoke(self, messages: Any, **kwargs: Any) -> str:
+        from langchain_core.messages import AIMessage
+
         self.calls.append(messages)
         prompt = _flatten(messages)
         if self.SUMMARY_HINT in prompt:
-            return self.FIXED_SUMMARY
+            return AIMessage(content=self.FIXED_SUMMARY)
         if self.default_response is not None:
-            return self.default_response
-        return json.dumps(
-            parse_request_text(_extract_request(prompt)), ensure_ascii=False
+            return AIMessage(content=self.default_response)
+        return AIMessage(
+            content=json.dumps(
+                parse_request_text(_extract_request(prompt)), ensure_ascii=False
+            )
         )
 
 

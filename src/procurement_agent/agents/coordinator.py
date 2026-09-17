@@ -16,6 +16,7 @@ from procurement_agent.agents.payloads import (
     sourcing_to_payload,
 )
 from procurement_agent.agents.qualification import run_qualification
+from procurement_agent.agents.response import response_text
 from procurement_agent.agents.sourcing import run_sourcing
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.erp.repository import ErpRepository
@@ -140,8 +141,14 @@ def build_handlers(deps: CoordinatorDeps):
             request_text=record.request_text,
         )
         _event(deps, task_id, "coordinator", "tool_call", {"tool": "requirement_parser"})
-        raw = model.invoke([{"role": "user", "content": prompt}])
-        parsed = json.loads(raw)
+
+        def parse_once() -> dict[str, Any]:
+            """模型调用与结构化校验放在同一个可重试单元内：
+            模型返回非法 JSON 时按可重试错误处理，而不是直接判失败。"""
+            raw = model.invoke([{"role": "user", "content": prompt}])
+            return json.loads(response_text(raw))
+
+        parsed = _call_subagent(deps, task_id, "coordinator", parse_once)
         _event(
             deps,
             task_id,

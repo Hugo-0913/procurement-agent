@@ -12,10 +12,12 @@ class FakeModel:
         self.calls: list[Any] = []
 
     def invoke(self, messages: Any, **kwargs: Any) -> str:
+        from langchain_core.messages import AIMessage
+
         self.calls.append(messages)
         if not self.responses:
             raise AssertionError("FakeModel 脚本已耗尽")
-        return self.responses.pop(0)
+        return AIMessage(content=self.responses.pop(0))
 
 
 class FixedModelFactory:
@@ -33,4 +35,3 @@ class FixedModelFactory:
 
 def json_response(**payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False)
-

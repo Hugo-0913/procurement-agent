@@ -80,6 +80,40 @@ def test_classify_json_error_before_value_error():
     assert classify_error(TimeoutError()) == "retryable"
 
 
+def test_classify_sdk_connection_errors_by_class_name():
+    class APIConnectionError(Exception):
+        pass
+
+    class OpenAIConnectionSubclass(APIConnectionError):
+        pass
+
+    assert classify_error(APIConnectionError("x")) == "retryable"
+    assert classify_error(OpenAIConnectionSubclass("x")) == "retryable"
+    assert classify_error(RuntimeError("x")) == "fatal"
+
+
+def test_sdk_error_retries_with_action(tmp_path):
+    store, task_id = make_store(tmp_path)
+    calls = {"n": 0}
+
+    class APIConnectionError(Exception):
+        pass
+
+    def flaky(_attempt: int) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise APIConnectionError("Connection error.")
+        return "ok"
+
+    result = run_with_retry(
+        flaky, max_attempts=3, store=store, task_id=task_id, agent="coordinator"
+    )
+    assert result == "ok"
+    retries = retry_events(store, task_id)
+    assert len(retries) == 1
+    assert retries[0].payload["corrective_action"] == "等待 1 秒后重连模型接口"
+
+
 def test_on_retry_callback_receives_event(tmp_path):
     store, task_id = make_store(tmp_path)
     seen = []
@@ -101,4 +135,3 @@ def test_on_retry_callback_receives_event(tmp_path):
     )
     assert len(seen) == 1
     assert seen[0].corrective_action == CORRECTIVE_ACTIONS["ConnectionError"]
-
