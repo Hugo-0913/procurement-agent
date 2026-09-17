@@ -12,6 +12,7 @@ from procurement_agent.agents.delegation import (
     DelegationRuntime,
     TaskContext,
 )
+from procurement_agent.agents.dates import is_iso_date, parse_relative_date
 from procurement_agent.agents.model import build_chat_model
 from procurement_agent.agents.ordering import InsufficientQuotesError
 from procurement_agent.agents.payloads import (
@@ -26,6 +27,7 @@ from procurement_agent.agents.response import response_text
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.erp.repository import ErpRepository
 from procurement_agent.middleware.reflection_retry import RetryExhausted, run_with_retry
+from procurement_agent.middleware.token_usage import TokenUsageCallback
 from procurement_agent.sandbox.policy import PolicyEngine
 from procurement_agent.skills_loader import SkillRegistry
 from procurement_agent.state.models import TaskState
@@ -194,9 +196,15 @@ def build_handlers(deps: CoordinatorDeps):
             """模型调用与结构化校验放在同一个可重试单元内：
             模型返回非法 JSON 时按可重试错误处理，而不是直接判失败。"""
             raw = model.invoke([{"role": "user", "content": prompt}])
+            TokenUsageCallback(deps.store, task_id).record_message(raw)
             return json.loads(response_text(raw))
 
         parsed = _call_subagent(deps, task_id, "coordinator", parse_once)
+        # 模型常把"下周一"原样返回，这里用确定性规则换算为 ISO 日期
+        if not is_iso_date(parsed.get("expected_date")):
+            parsed["expected_date"] = parse_relative_date(
+                parsed.get("expected_date")
+            ) or parse_relative_date(record.request_text)
         _event(
             deps,
             task_id,

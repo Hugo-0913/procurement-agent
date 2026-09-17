@@ -29,6 +29,7 @@ from procurement_agent.agents.payloads import (
 )
 from procurement_agent.agents.qualification import run_qualification
 from procurement_agent.agents.sourcing import run_sourcing
+from procurement_agent.middleware.token_usage import TokenUsageCallback
 from procurement_agent.skills_loader import SkillRegistry
 from procurement_agent.state.store import TaskStore
 
@@ -266,7 +267,8 @@ class DelegationRuntime:
         token = CURRENT_TASK.set(context)
         try:
             result = self.agent.invoke(
-                {"messages": [{"role": "user", "content": instruction}]}
+                {"messages": [{"role": "user", "content": instruction}]},
+                {"callbacks": [TokenUsageCallback(context.store, context.task_id)]},
             )
         finally:
             CURRENT_TASK.reset(token)
