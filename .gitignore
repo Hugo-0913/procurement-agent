@@ -6,4 +6,4 @@ data/*.db
 workspace/
 eval_results/
 .pytest_cache/
-
+*.egg-info/
