@@ -12,6 +12,41 @@
 
 **遗留影响：** base 环境中的 gradio、jupyter-server 可能因 websockets / anyio 升级而不可用，需要时用 conda 单独修复。
 
+### D-001 补记：base 环境已修复（2026-09-17 晚）
+
+**确认受损范围**（`python -m pip check` + 导入测试）：真正由本次误装造成的是三处——
+`gradio 3.41.2` / `gradio-client 0.5.0` 要求 `websockets<12`（被升到 16.1.1）；
+`jupyter-server 1.23.4` 要求 `anyio<4`（被升到 4.15.1）；`pydantic` 被从 1.10.12 升到 2.x，
+连带 `fastapi`、`starlette`、`sqlalchemy`、`httpx`、`pytest` 等一并被升级。
+其余报错项（torch/torchaudio/torchvision、tables、s3fs、gensim、numba 等）**在本次误装之前就存在**，
+不属于本次影响范围，未做改动。
+
+**修复动作：**
+
+1. 备份当前环境清单到 `%TEMP%\base-env-freeze-before-repair.txt`（490 个包）。
+2. 从 base 卸载本项目引入的 40 个包（langchain / langgraph / deepagents / openai / anthropic 等），
+   项目已在 `.venv` 中自带这些依赖。
+3. 把被升级的 23 个包恢复到原版本：`zstandard 0.19.0`、`websockets 11.0.3`、
+   `typing-extensions 4.7.1`、`tenacity 8.2.2`、`pluggy 1.0.0`、`packaging 23.0`、
+   `orjson 3.9.7`、`jsonpatch 1.32`、`idna 3.4`、`h11 0.12.0`、`certifi 2023.7.22`、
+   `annotated-types 0.5.0`、`aiosqlite 0.18.0`、`pytest 7.4.0`、`pydantic-core 2.6.3`、
+   `httpcore 0.15.0`、`anyio 3.7.1`、`starlette 0.26.1`、`pydantic 1.10.12`、
+   `httpx 0.24.1`、`google-auth 2.23.0`、`fastapi 0.94.0`。
+
+**一处未完全复原：** `SQLAlchemy` 恢复到 **1.4.46** 而不是原来的 1.4.39。原因是 1.4.39 没有
+cp311 预编译包，而 base 的 setuptools 本身是坏的（`backports` 包冲突导致
+`ImportError: cannot import name 'tarfile' from 'backports'`），pip 无法在 base 中构建源码包；
+`conda install --no-deps` 对 490 个包的 base 环境解算超过 20 分钟仍未完成，已终止。
+1.4.46 与 1.4.39 同属 1.4 系列、API 兼容，属于补丁级差异。
+
+**顺带发现的既有问题（未处理，属独立问题）：** base 的 setuptools 因 `backports` 命名冲突无法导入，
+这会让任何需要构建源码包的操作失败。修它需要动 base 的 setuptools / backports，风险与本项目无关，
+建议单独处理。
+
+**验证结果：** `pip check` 中与 gradio / jupyter-server / pydantic 相关的冲突全部消除；
+`gradio 3.41.2`、`jupyter_server 1.23.4`、`fastapi 0.94.0` + pydantic v1 API 均能正常导入；
+项目本身的 `.venv` 不受影响（仍是 pydantic 2.13.5 / fastapi 0.141.1），205 项测试全部通过。
+
 ---
 
 ## D-002 依赖版本锁定（2026-09-17，Task 2 冒烟验证产出）

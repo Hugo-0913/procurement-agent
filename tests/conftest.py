@@ -103,7 +103,12 @@ async def client(offline_app):
         yield http_client
 
 
-async def wait_for_state(client, task_id: str, targets, timeout: float = 15.0):
+async def wait_for_state(client, task_id: str, targets, timeout: float = 60.0):
+    """轮询直到任务到达目标状态。
+
+    超时给得比较宽：每个应用实例都要现场构建 DeepAgents 图，整包并行跑测试时
+    机器负载高，15 秒会偶发不够（曾经的偶发失败即源于此）。
+    """
     import asyncio
     import time
 
