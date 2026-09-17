@@ -32,7 +32,13 @@ copy .env.example .env
 .venv\Scripts\python.exe -m uvicorn procurement_agent.web.app:create_app --factory --port 8000
 ```
 
-打开 http://127.0.0.1:8000 即可看到任务看板页。无需 API key 也能完整体验：系统内置离线模型，评测与测试全部离线运行。
+打开 http://127.0.0.1:8000 即可看到任务看板页。
+
+**模型模式是自动判断的**：未配置 `DEEPSEEK_API_KEY` 时，应用会自动切换到内置离线解析器（正则规则，不联网），
+页面顶部显示橙色"离线演示模式"横幅，全流程仍可完整跑通（不联网）。配置 key 后重启即用真实
+模型，横幅消失。想强制离线可用 `.venv\Scripts\python.exe -m uvicorn procurement_agent.web.app:create_demo_app --factory --port 8000`。
+
+评测与测试全程离线运行，不需要任何 API key。
 
 ## 目录结构
 
@@ -86,4 +92,3 @@ docs/              架构、安全、决策记录、演示脚本
 已实现：状态机与持久化审批中断、四类技能渐进式加载、三类子 Agent 委派、虚拟文件系统与路径逃逸防护、持久化记忆、上下文摘要、双层沙箱、反思重试、四个页面、可复现评测。
 
 明确不做：真实 ERP 对接、容器级隔离、多租户与 SSO、支付/收货/入库/对账、寻源与招投标、技能热插拔、向量检索记忆、并发多任务、多模型路由、移动端适配、性能压测。详见 PRD 3.2。
-

@@ -154,7 +154,8 @@ def _run_single_case(
     repo = ErpRepository(engine, faults)
     store = TaskStore(engine)
     skills = SkillRegistry()
-    model_factory = offline_model_factory(_parse_response(case.quantity))
+    # 不传固定脚本：让评测真正走一遍规则解析器，而不是复用预先给定的解析结果
+    model_factory = offline_model_factory()
     deps = CoordinatorDeps(
         repo=repo,
         store=store,

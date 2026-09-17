@@ -22,6 +22,10 @@ body {
 .topnav a { color: #cbd5e1; text-decoration: none; margin-right: 14px; }
 .topnav a.active { color: #fff; font-weight: 600; }
 main { padding: 16px 20px 40px; }
+.banner {
+  background: #fffbeb; border: 1px solid var(--orange); color: #92400e;
+  border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px;
+}
 .panel {
   background: #fff; border: 1px solid var(--line); border-radius: 8px;
   padding: 14px 16px; margin-bottom: 14px;
@@ -96,4 +100,3 @@ tr.blacklisted { background: #fef2f2; }
 .switch { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .metric { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
 .metric .value { font-size: 22px; font-weight: 600; color: var(--blue); }
-

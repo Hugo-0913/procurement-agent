@@ -32,6 +32,7 @@ class WebContext:
     memory: MemoryStore
     templates: Any
     eval_runner: Any | None = None
+    offline: bool = False
 
 
 class CreateTaskRequest(BaseModel):
@@ -157,7 +158,9 @@ def build_router(ctx: WebContext) -> APIRouter:
 
     @router.get("/", include_in_schema=False)
     def board_page(request: Request):
-        return ctx.templates.TemplateResponse(request, "board.html", {"nav": "board"})
+        return ctx.templates.TemplateResponse(
+            request, "board.html", {"nav": "board", "offline_mode": ctx.offline}
+        )
 
     @router.get("/tasks/{task_id}", include_in_schema=False)
     def task_page(request: Request, task_id: str):

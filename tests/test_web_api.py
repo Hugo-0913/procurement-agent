@@ -1,3 +1,5 @@
+import pytest
+
 from tests.conftest import make_offline_app, make_client, wait_for_state
 
 
@@ -86,3 +88,83 @@ async def test_suppliers_and_quotes_endpoints(offline_app):
         quotes = (await client.get("/api/quotes")).json()
         assert len(quotes) == 3
 
+
+async def test_auto_mode_falls_back_to_offline_without_key(tmp_path, monkeypatch):
+    """没有 API key 时不应让任务失败，而应自动使用离线模型跑通全流程。"""
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = create_app(tmp_path / "auto.db")
+    assert app.state.offline is True
+
+    async with await make_client(app) as client:
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        task_id = created.json()["task_id"]
+        detail = await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
+        assert detail["state"] == "COMPLETED"
+        assert detail["order_id"] is not None
+
+
+async def test_auto_mode_board_shows_offline_banner(tmp_path, monkeypatch):
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = create_app(tmp_path / "auto.db")
+    async with await make_client(app) as client:
+        html = (await client.get("/")).text
+        assert "离线演示模式" in html
+
+
+async def test_explicit_offline_false_requires_key(tmp_path, monkeypatch):
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = create_app(tmp_path / "live.db", offline=False)
+    assert app.state.offline is False
+    async with await make_client(app) as client:
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        task_id = created.json()["task_id"]
+        detail = await wait_for_state(client, task_id, {"FAILED", "COMPLETED"})
+        assert detail["state"] == "FAILED"
+        errors = [e for e in detail["events"] if e["event_type"] == "error"]
+        assert errors and "DEEPSEEK_API_KEY" in errors[0]["payload"]["message"]
+
+
+async def test_demo_app_factory_forces_offline(tmp_path, monkeypatch):
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-dummy-for-this-test")
+    app = create_app(tmp_path / "demo.db", offline=True)
+    assert app.state.offline is True
+
+
+async def test_offline_parser_drives_approval_flow(tmp_path, monkeypatch):
+    """回归：没有 API key 时，提交"3000 箱"必须真的按 3000 箱解析并触发审批。"""
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = create_app(tmp_path / "parser.db")
+    async with await make_client(app) as client:
+        created = await client.post(
+            "/api/tasks", json={"request_text": "采购 3000 箱 A4 纸，成本中心 CC-1001"}
+        )
+        task_id = created.json()["task_id"]
+        detail = await wait_for_state(client, task_id, {"AWAITING_APPROVAL", "FAILED"})
+        assert detail["state"] == "AWAITING_APPROVAL"
+        assert detail["structured_request"]["quantity"] == 3000
+        assert detail["pending_approval"]["order_draft"]["quantity"] == 3000
+
+
+async def test_vague_request_asks_for_clarification(tmp_path, monkeypatch):
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = create_app(tmp_path / "clarify.db")
+    async with await make_client(app) as client:
+        created = await client.post("/api/tasks", json={"request_text": "帮我再采购一些纸"})
+        task_id = created.json()["task_id"]
+        detail = await wait_for_state(client, task_id, {"PARSING", "COMPLETED", "FAILED"})
+        assert detail["state"] == "PARSING"
+        assert not [
+            e for e in detail["events"] if e["event_type"] == "agent_delegation"
+        ]
