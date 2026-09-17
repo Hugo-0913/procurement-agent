@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS materials (
     name TEXT NOT NULL,
     spec TEXT,
     unit TEXT NOT NULL DEFAULT '件',
-    category TEXT
+    category TEXT,
+    aliases TEXT
 );
 
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -121,4 +122,3 @@ CREATE TABLE IF NOT EXISTS fault_flags (
 CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events (task_id, seq);
 CREATE INDEX IF NOT EXISTS idx_quotes_material ON quotes (material_id);
 CREATE INDEX IF NOT EXISTS idx_price_history_material ON price_history (material_id, supplier_id);
-

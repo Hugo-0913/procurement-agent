@@ -5,6 +5,8 @@ const EVENT_LABELS = {
     p.mode === "framework"
       ? `框架委派成功：${p.to}`
       : `未委派，降级为直接执行：${p.to}${p.reason ? "（" + p.reason + "）" : ""}`,
+  clarification_requested: (p) => `需要澄清：${p.question || "缺少必要信息"}`,
+  clarification_answered: (p) => `用户补充：${p.answer || ""}`,
   tool_call: (p) => `调用 ${p.tool}`,
   tool_result: (p) => `${p.tool}: ${p.summary || "完成"}`,
   skill_loaded: (p) => `已加载技能 ${p.skill}`,
@@ -68,7 +70,7 @@ function renderTree(events) {
       const agent = d.payload.to;
       const steps = (stepsByAgent[agent] || []).map(renderStep).join("") ||
         '<div class="hint">（无工具调用记录）</div>';
-      return `<div class="tree-node"><div><span class="tag">子 Agent</span>${agent}</div>${steps}</div>`;
+      return `<div class="tree-node"><div class="node-head"><span class="tag">子 Agent</span>${agent}</div>${steps}</div>`;
     })
     .join("");
 
@@ -78,14 +80,14 @@ function renderTree(events) {
   const extras = otherAgents
     .map(
       (a) =>
-        `<div class="tree-node"><div><span class="tag mid-tag">中间件</span>${a}</div>${stepsByAgent[a]
-          .map(renderStep)
-          .join("")}</div>`
+        `<div class="tree-node"><div class="node-head"><span class="tag mid-tag">中间件</span>${a}</div>${
+          stepsByAgent[a].map(renderStep).join("")
+        }</div>`
     )
     .join("");
 
   root.innerHTML =
-    `<div class="tree-node tree-root"><div><span class="tag">主 Agent</span>coordinator</div>${rootSteps}</div>` +
+    `<div class="tree-node tree-root"><div class="node-head"><span class="tag">主 Agent</span>coordinator</div>${rootSteps}</div>` +
     branches +
     extras;
 
@@ -101,11 +103,18 @@ function renderTree(events) {
 }
 
 function renderStep(step) {
-  const cls = step.status === "denied" ? "step denied" : step.status === "failed" ? "step failed" : "step";
+  const cls =
+    step.status === "denied"
+      ? "step denied"
+      : step.status === "failed"
+      ? "step failed"
+      : step.status === "done"
+      ? "step done"
+      : "step";
   const retry = step.retries ? `<span class="hint">第 ${step.retries + 1} 次重试</span>` : "";
   const flag = step.status === "denied" ? '<span class="hint">等待审批</span>' : "";
   return `<div class="${cls}" data-seq="${step.seq}">
-      <span>${step.name}</span>${retry}${flag}
+      <span class="step-name">${step.name}</span>${retry}${flag}
       <span class="hint">${step.detail[step.detail.length - 1] || ""}</span>
     </div>`;
 }

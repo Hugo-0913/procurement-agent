@@ -22,17 +22,17 @@ function render() {
     return t.state === filter;
   });
   if (!rows.length) {
-    list.innerHTML = '<p class="hint">暂无任务，提交一条采购需求试试。</p>';
+    list.innerHTML = '<p class="empty">暂无任务。填一条采购需求，或点「填入示例需求」试试。</p>';
     return;
   }
   list.innerHTML = rows
     .map(
-      (t) => `<div class="card" data-id="${t.id}">
-        <div>${t.summary}</div>
-        <div class="row" style="margin-top:8px">
+      (t) => `<div class="card" data-id="${t.id}" data-tone="${STATE_CLASS[t.state] || "blue"}">
+        <div class="card-title">${t.summary}</div>
+        <div class="card-meta">
           ${badge(t)}
           <span class="hint">${t.created_at}</span>
-          ${t.human_interventions ? `<span class="hint">人工介入 ${t.human_interventions} 次</span>` : ""}
+          ${t.human_interventions ? `<span class="badge gray">人工介入 ${t.human_interventions} 次</span>` : ""}
         </div>
       </div>`
     )
@@ -84,4 +84,3 @@ document.querySelectorAll("#status-filters .chip").forEach((chip) => {
 
 loadTasks();
 setInterval(loadTasks, 4000);
-

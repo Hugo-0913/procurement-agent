@@ -72,6 +72,17 @@ class FaultRequest(BaseModel):
     enabled: bool
 
 
+class ClarificationRequest(BaseModel):
+    answer: str
+
+    @field_validator("answer")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("补充说明不能为空")
+        return value.strip()
+
+
 def _event_payload(store: TaskStore, task_id: str, event_type: str) -> dict[str, Any] | None:
     events = [e for e in store.list_events(task_id) if e.event_type == event_type]
     return events[-1].payload if events else None
@@ -90,6 +101,13 @@ def build_task_detail(ctx: WebContext, task_id: str) -> dict[str, Any]:
     all_skills = [meta.name for meta in ctx.skills.list_metadata()]
 
     pending = None
+    pending_clarification = None
+    if record.state is TaskState.AWAITING_CLARIFICATION:
+        requested = _event_payload(ctx.store, task_id, "clarification_requested") or {}
+        pending_clarification = {
+            "question": requested.get("question", "请补充缺失的采购信息。"),
+            "missing": requested.get("missing", []),
+        }
     if record.state is TaskState.AWAITING_APPROVAL:
         requested = _event_payload(ctx.store, task_id, "approval_requested") or {}
         draft_event = next(
@@ -136,6 +154,7 @@ def build_task_detail(ctx: WebContext, task_id: str) -> dict[str, Any]:
         "metadata_only_skills": [s for s in all_skills if s not in set(loaded_skills)],
         "memory_block": ctx.memory.render_prompt_block(),
         "pending_approval": pending,
+        "pending_clarification": pending_clarification,
         "order_id": order_event.get("order_id") if order_event else None,
         "sourcing": sourcing_detail,
         "events": [
@@ -165,7 +184,9 @@ def build_router(ctx: WebContext) -> APIRouter:
     @router.get("/tasks/{task_id}", include_in_schema=False)
     def task_page(request: Request, task_id: str):
         return ctx.templates.TemplateResponse(
-            request, "task.html", {"nav": "board", "task_id": task_id}
+            request,
+            "task.html",
+            {"nav": "board", "task_id": task_id, "offline_mode": ctx.offline},
         )
 
     @router.get("/data", include_in_schema=False)
@@ -176,6 +197,7 @@ def build_router(ctx: WebContext) -> APIRouter:
             "data.html",
             {
                 "nav": "data",
+                "offline_mode": ctx.offline,
                 "fault_flags": [
                     {"flag": flag, "label": FLAG_LABELS.get(flag, flag), "enabled": flags.get(flag, False)}
                     for flag in ALL_FLAGS
@@ -185,7 +207,9 @@ def build_router(ctx: WebContext) -> APIRouter:
 
     @router.get("/eval", include_in_schema=False)
     def eval_page(request: Request):
-        return ctx.templates.TemplateResponse(request, "eval.html", {"nav": "eval"})
+        return ctx.templates.TemplateResponse(
+            request, "eval.html", {"nav": "eval", "offline_mode": ctx.offline}
+        )
 
     # ---------- 任务 ----------
 
@@ -245,6 +269,14 @@ def build_router(ctx: WebContext) -> APIRouter:
             },
         )
         ctx.runner.resume(task_id, payload.decision, payload.operator, payload.reason)
+        return build_task_detail(ctx, task_id)
+
+    @router.post("/api/tasks/{task_id}/clarification")
+    def clarify(task_id: str, payload: ClarificationRequest) -> dict[str, Any]:
+        record = ctx.store.get_task(task_id)
+        if record.state is not TaskState.AWAITING_CLARIFICATION:
+            raise HTTPException(status_code=409, detail="任务当前不需要补充信息")
+        ctx.runner.continue_after_clarification(task_id, payload.answer)
         return build_task_detail(ctx, task_id)
 
     # ---------- 数据台 ----------

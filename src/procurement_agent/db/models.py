@@ -33,6 +33,7 @@ class Material(Base):
     spec: Mapped[str | None] = mapped_column(String(128))
     unit: Mapped[str] = mapped_column(String(16), default="件")
     category: Mapped[str | None] = mapped_column(String(64))
+    aliases: Mapped[str | None] = mapped_column(Text)
 
 
 class Supplier(Base):
@@ -122,10 +123,23 @@ def init_db(db_path: Path) -> Engine:
     connection = sqlite3.connect(target)
     try:
         connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        _migrate(connection)
         connection.commit()
     finally:
         connection.close()
     return create_engine(f"sqlite+pysqlite:///{target.as_posix()}", future=True)
+
+
+def _migrate(connection: sqlite3.Connection) -> None:
+    """轻量增量迁移：为既有数据库补上后来新增的列。
+
+    演示项目用最小实现，避免引入 Alembic；生产环境应换成正式迁移工具。
+    """
+    columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(materials)").fetchall()
+    }
+    if "aliases" not in columns:
+        connection.execute("ALTER TABLE materials ADD COLUMN aliases TEXT")
 
 
 from procurement_agent.db.seed import seed_demo_data  # noqa: E402

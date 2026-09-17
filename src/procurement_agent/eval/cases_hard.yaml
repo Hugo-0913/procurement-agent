@@ -4,13 +4,13 @@
   request_text: 帮我买点办公用纸
   quantity: 0
   faults: {}
-  expect_state: PARSING
+  expect_state: AWAITING_CLARIFICATION
   expect_approval: false
 - id: H-02
   request_text: 采购 10 个鼠标
   quantity: 10
   faults: {}
-  expect_state: PARSING
+  expect_state: AWAITING_CLARIFICATION
   expect_approval: false
 - id: H-03
   request_text: 采购 50 箱 A4复印纸，成本中心 CC-1001

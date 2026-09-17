@@ -10,7 +10,10 @@ function renderReport(report) {
     ["上下文压缩率", ((report.context_reduction_rate ?? 0) * 100).toFixed(1) + "%"],
   ];
   document.getElementById("eval-metrics").innerHTML = metrics
-    .map(([label, value]) => `<div class="metric"><div class="hint">${label}</div><div class="value">${value}</div></div>`)
+    .map(
+      ([label, value]) =>
+        `<div class="metric"><div class="hint">${label}</div><div class="value">${value}</div></div>`
+    )
     .join("");
   const failures = report.failures || [];
   document.getElementById("eval-failures").innerHTML = failures.length

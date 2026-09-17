@@ -8,6 +8,7 @@ from typing import Any
 class TaskState(StrEnum):
     PENDING = "PENDING"
     PARSING = "PARSING"
+    AWAITING_CLARIFICATION = "AWAITING_CLARIFICATION"
     QUALIFYING = "QUALIFYING"
     SOURCING = "SOURCING"
     ORDER_DRAFTING = "ORDER_DRAFTING"
@@ -22,7 +23,14 @@ TERMINAL_STATES = frozenset({TaskState.COMPLETED, TaskState.FAILED})
 
 ALLOWED_TRANSITIONS: dict[TaskState, frozenset[TaskState]] = {
     TaskState.PENDING: frozenset({TaskState.PARSING, TaskState.FAILED}),
-    TaskState.PARSING: frozenset({TaskState.QUALIFYING, TaskState.FAILED}),
+    TaskState.PARSING: frozenset(
+        {
+            TaskState.QUALIFYING,
+            TaskState.AWAITING_CLARIFICATION,
+            TaskState.FAILED,
+        }
+    ),
+    TaskState.AWAITING_CLARIFICATION: frozenset({TaskState.PARSING, TaskState.FAILED}),
     TaskState.QUALIFYING: frozenset({TaskState.SOURCING, TaskState.FAILED}),
     TaskState.SOURCING: frozenset({TaskState.ORDER_DRAFTING, TaskState.FAILED}),
     TaskState.ORDER_DRAFTING: frozenset(
@@ -49,6 +57,8 @@ EVENT_TYPES = frozenset(
         "tool_call",
         "tool_result",
         "skill_loaded",
+        "clarification_requested",
+        "clarification_answered",
         "policy_denied",
         "retry",
         "context_summarized",
@@ -64,6 +74,7 @@ EVENT_TYPES = frozenset(
 STAGE_LABELS: dict[TaskState, str] = {
     TaskState.PENDING: "待启动",
     TaskState.PARSING: "需求解析",
+    TaskState.AWAITING_CLARIFICATION: "等待澄清",
     TaskState.QUALIFYING: "资质核验",
     TaskState.SOURCING: "比价分析",
     TaskState.ORDER_DRAFTING: "订单草稿",
@@ -96,4 +107,3 @@ class TaskRecord:
     finished_at: str | None = None
     human_interventions: int = 0
     token_usage: dict[str, Any] = field(default_factory=dict)
-

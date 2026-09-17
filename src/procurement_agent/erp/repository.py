@@ -47,6 +47,10 @@ def _keywords(raw_name: Any) -> list[str]:
     return [part for part in parts if part]
 
 
+def _alias_list(raw: Any) -> list[str]:
+    return [item.strip() for item in str(raw or "").split(",") if item.strip()]
+
+
 def _as_mapping(value: Any) -> dict[str, Any]:
     if isinstance(value, Mapping):
         return dict(value)
@@ -72,18 +76,20 @@ class ErpRepository:
         with Session(self.engine) as session:
             materials = list(session.scalars(select(Material)))
             for material in materials:
-                normalized = _normalize_name(material.name)
-                if normalized == target or _normalize_name(material.sku) == target:
+                candidates = [material.name, material.sku, *_alias_list(material.aliases)]
+                if any(_normalize_name(item) == target for item in candidates):
                     return material
-            # 关键词全覆盖：模型返回"A4复印纸"时，主数据的"A4"与"纸"都能命中
+            # 关键词全覆盖：模型返回"A4复印纸"时，主数据的"A4"与"纸"都能命中；
+            # 别名同样参与匹配，例如用户说的"办公用纸"能对上"A4 纸"的别名
             best: Material | None = None
             best_score = 0
             for material in materials:
-                keys = _keywords(material.name)
-                if keys and all(key in target for key in keys):
-                    score = sum(len(key) for key in keys)
-                    if score > best_score:
-                        best, best_score = material, score
+                for source in [material.name, *_alias_list(material.aliases)]:
+                    keys = _keywords(source)
+                    if keys and all(key in target for key in keys):
+                        score = sum(len(key) for key in keys)
+                        if score > best_score:
+                            best, best_score = material, score
             return best
 
     def get_material(self, material_id: int) -> Material | None:

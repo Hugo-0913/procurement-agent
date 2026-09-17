@@ -44,3 +44,16 @@ def test_blank_input_returns_none(tmp_path):
     assert repo.find_material_by_name("") is None
     assert repo.find_material_by_name(None) is None
 
+
+def test_alias_from_master_data_matches(tmp_path):
+    """主数据里的别名应能命中：用户说"办公用纸"、"复印纸"都要能对上 A4 纸。"""
+    repo = make_repo(tmp_path)
+    for text in ("办公用纸", "复印纸", "打印纸", "A4纸"):
+        material = repo.find_material_by_name(text)
+        assert material is not None, f"别名未命中: {text}"
+        assert material.sku == "ST-A4-500"
+
+
+def test_extra_words_with_alias_still_match(tmp_path):
+    repo = make_repo(tmp_path)
+    assert repo.find_material_by_name("普通办公用纸（白）") is not None

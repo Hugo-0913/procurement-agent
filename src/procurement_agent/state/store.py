@@ -119,6 +119,15 @@ class TaskStore:
                 {"payload": json.dumps(payload, ensure_ascii=False), "now": _now(), "id": task_id},
             )
 
+    def set_request_text(self, task_id: str, request_text: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE tasks SET request_text = :text, updated_at = :now WHERE id = :id"
+                ),
+                {"text": request_text, "now": _now(), "id": task_id},
+            )
+
     def record_intervention(self, task_id: str) -> None:
         with self.engine.begin() as conn:
             conn.execute(
@@ -220,4 +229,3 @@ class TaskStore:
             )
             for row in rows
         ]
-

@@ -113,12 +113,43 @@ def test_clarification_task_never_loads_later_skills(tmp_path):
     task_id = runner.start("帮我再采购一些纸")
 
     record = store.get_task(task_id)
-    assert record.state is TaskState.PARSING
+    assert record.state is TaskState.AWAITING_CLARIFICATION
     assert skills.loaded_names == {"requirement_parsing"}
     delegations = [
         e for e in store.list_events(task_id) if e.event_type == "agent_delegation"
     ]
     assert delegations == []
+    requested = [
+        e for e in store.list_events(task_id) if e.event_type == "clarification_requested"
+    ]
+    assert requested and "数量" in requested[0].payload["question"]
+
+
+def test_clarification_answer_continues_the_task(tmp_path):
+    """用户补充信息后任务应从解析阶段续跑，而不是永远停在提问状态。"""
+    _, store, _, runner = build_runner(
+        tmp_path, [parse_response(quantity=0), parse_response(quantity=50)]
+    )
+    task_id = runner.start("帮我再采购一些纸")
+    assert store.get_task(task_id).state is TaskState.AWAITING_CLARIFICATION
+
+    runner.continue_after_clarification(task_id, "50 箱")
+    record = store.get_task(task_id)
+    assert record.state is TaskState.COMPLETED
+    assert record.structured_request["quantity"] == 50
+    kinds = [e.event_type for e in store.list_events(task_id)]
+    assert "clarification_answered" in kinds
+    assert kinds.count("clarification_requested") == 1
+
+
+def test_clarification_cannot_be_answered_for_other_states(tmp_path):
+    from procurement_agent.state.store import InvalidTransition
+
+    _, store, _, runner = build_runner(tmp_path, [parse_response()])
+    task_id = runner.start(DEFAULT_REQUEST)
+    assert store.get_task(task_id).state is TaskState.COMPLETED
+    with pytest.raises(InvalidTransition):
+        runner.continue_after_clarification(task_id, "50 箱")
 
 
 def test_large_order_requests_approval(tmp_path):

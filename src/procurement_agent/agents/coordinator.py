@@ -218,23 +218,41 @@ def build_handlers(deps: CoordinatorDeps):
 
         missing = [field for field in REQUIRED_PARSE_FIELDS if not parsed.get(field)]
         if missing:
-            question = "请补充采购物料名称与数量，我才能继续。"
+            fields = "、".join("物料名称" if f == "material_name" else "数量" for f in missing)
+            question = f"需求里缺少{fields}，请补充后我再继续比价与下单。"
+            _event(
+                deps,
+                task_id,
+                "coordinator",
+                "clarification_requested",
+                {"question": question, "missing": missing},
+            )
             return StageResult(
-                state=TaskState.PARSING,
+                state=TaskState.AWAITING_CLARIFICATION,
                 payload={
                     "needs_clarification": True,
                     "question": question,
+                    "missing_fields": missing,
                     "structured_request": parsed,
                 },
             )
 
         material = deps.repo.find_material_by_name(str(parsed["material_name"]))
         if material is None:
+            question = f"物料主数据中找不到「{parsed['material_name']}」，请确认物料名称。"
+            _event(
+                deps,
+                task_id,
+                "coordinator",
+                "clarification_requested",
+                {"question": question, "missing": ["material_name"]},
+            )
             return StageResult(
-                state=TaskState.PARSING,
+                state=TaskState.AWAITING_CLARIFICATION,
                 payload={
                     "needs_clarification": True,
-                    "question": f"物料主数据中找不到「{parsed['material_name']}」，请确认物料名称。",
+                    "question": question,
+                    "missing_fields": ["material_name"],
                     "structured_request": parsed,
                 },
             )

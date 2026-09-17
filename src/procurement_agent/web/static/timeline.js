@@ -1,5 +1,20 @@
 const MIDDLEWARE_AGENTS = new Set(["context_summarizer", "policy_engine", "policy_guard"]);
 
+const TIMELINE_TONE = {
+  stage_change: "ok",
+  task_finished: "ok",
+  agent_delegation: "ok",
+  delegation_result: "ok",
+  policy_denied: "warn",
+  approval_requested: "warn",
+  clarification_requested: "warn",
+  retry: "warn",
+  error: "error",
+  context_summarized: "middleware",
+  memory_loaded: "middleware",
+  memory_written: "middleware",
+};
+
 function renderTimeline(events) {
   const root = document.getElementById("timeline");
   const agentFilter = document.getElementById("filter-agent").value;
@@ -16,9 +31,13 @@ function renderTimeline(events) {
         : e.event_type === "skill_loaded"
         ? '<span class="tag">技能</span>'
         : `<span class="tag">${e.agent}</span>`;
-      return `<div class="tl-item" data-seq="${e.seq}">[${time}] ${tag}${describe(e)}</div>`;
+      const tone = TIMELINE_TONE[e.event_type] || "tool";
+      return `<div class="tl-item ${tone}" data-seq="${e.seq}">
+        <span class="tl-time">${time}</span>
+        <span class="tl-body">${tag}${describe(e)}</span>
+      </div>`;
     })
-    .join("") || '<p class="hint">暂无事件</p>';
+    .join("") || '<p class="empty">暂无事件</p>';
 
   root.querySelectorAll(".tl-item").forEach((el) => {
     el.onclick = () => {

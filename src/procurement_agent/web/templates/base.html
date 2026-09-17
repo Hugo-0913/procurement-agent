@@ -8,12 +8,15 @@
 </head>
 <body>
   <header class="topnav">
-    <span class="brand">耗材采购自动化 Agent</span>
+    <span class="brand"><span class="brand-mark">采</span>采购自动化 Agent</span>
     <nav>
       <a href="/" class="{% if nav == 'board' %}active{% endif %}">任务看板</a>
       <a href="/data" class="{% if nav == 'data' %}active{% endif %}">数据台</a>
       <a href="/eval" class="{% if nav == 'eval' %}active{% endif %}">评测</a>
     </nav>
+    <span class="mode-badge {% if offline_mode %}offline{% else %}live{% endif %}">
+      {% if offline_mode %}离线演示模式{% else %}真实模型{% endif %}
+    </span>
   </header>
   <main>
     {% block content %}{% endblock %}
@@ -21,4 +24,3 @@
   {% block scripts %}{% endblock %}
 </body>
 </html>
-

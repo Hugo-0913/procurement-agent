@@ -25,6 +25,24 @@ def test_seed_is_idempotent(tmp_path):
     assert len(repo.list_suppliers()) == 4
 
 
+def test_existing_db_gets_aliases_backfilled(tmp_path):
+    """老库里的物料没有别名字段时，重跑种子应补齐，而不是被幂等逻辑跳过。"""
+    import sqlite3
+
+    db = tmp_path / "erp.db"
+    engine = init_db(db)
+    seed_demo_data(engine)
+    # 模拟"早期建的库"：把别名清空
+    con = sqlite3.connect(db)
+    con.execute("UPDATE materials SET aliases = NULL")
+    con.commit()
+    con.close()
+
+    seed_demo_data(engine)  # 幂等路径，应触发回填
+    repo = ErpRepository(engine)
+    assert repo.find_material_by_name("办公用纸") is not None
+
+
 def test_quotes_available_for_material(tmp_path):
     repo = make_repo(tmp_path)
     material = repo.find_material_by_name("A4 纸")
@@ -81,4 +99,3 @@ def test_qualification_expiry_relative_to_today(tmp_path):
     assert quals
     delta = (quals[0].expires_at - date.today()).days
     assert 0 < delta <= 30
-

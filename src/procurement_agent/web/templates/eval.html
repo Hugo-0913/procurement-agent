@@ -2,18 +2,21 @@
 {% block title %}评测 · 耗材采购自动化 Agent{% endblock %}
 {% block content %}
 <section class="panel">
+  <div class="panel-head">
+    <h2>可复现评测</h2>
+    <span class="hint">固定用例集 · 独立数据库 · 结果可重复</span>
+  </div>
   <div class="row">
-    <button id="eval-run">运行评测</button>
+    <button id="eval-run" class="primary">运行评测</button>
     <span id="eval-status" class="hint"></span>
   </div>
-  <div id="eval-metrics" class="cards"></div>
+  <div id="eval-metrics" class="metric-grid"></div>
 </section>
 <section class="panel">
-  <h3>失败用例</h3>
+  <div class="panel-head"><h3>失败用例</h3></div>
   <div id="eval-failures"></div>
 </section>
 {% endblock %}
 {% block scripts %}
 <script src="/static/eval.js"></script>
 {% endblock %}
-

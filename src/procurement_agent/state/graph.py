@@ -11,7 +11,7 @@ from langgraph.types import Command, interrupt
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.state.models import TaskState
 from procurement_agent.state.nodes import StageResult
-from procurement_agent.state.store import TaskStore
+from procurement_agent.state.store import InvalidTransition, TaskStore
 
 Handler = Callable[[str, dict[str, Any]], StageResult]
 
@@ -166,7 +166,9 @@ class TaskRunner:
 
     def run(self, task_id: str, request_text: str) -> None:
         """在已创建的任务上执行流程（供后台线程调用）。"""
-        self.store.transition(task_id, TaskState.PARSING)
+        current = self.store.get_task(task_id).state
+        if current is not TaskState.PARSING:
+            self.store.transition(task_id, TaskState.PARSING)
         try:
             self.graph.invoke(
                 {
@@ -180,6 +182,21 @@ class TaskRunner:
             )
         except Exception as exc:  # noqa: BLE001
             self._fail(task_id, exc)
+
+    def continue_after_clarification(self, task_id: str, answer: str) -> None:
+        """把用户的补充说明并回需求文本，从解析阶段续跑。"""
+        record = self.store.get_task(task_id)
+        if record.state is not TaskState.AWAITING_CLARIFICATION:
+            raise InvalidTransition(record.state, TaskState.PARSING)
+        merged = f"{record.request_text}\n补充说明：{answer}"
+        self.store.set_request_text(task_id, merged)
+        self.store.append_event(
+            task_id,
+            agent="human",
+            event_type="clarification_answered",
+            payload={"answer": answer},
+        )
+        self.run(task_id, merged)
 
     def resume(self, task_id: str, decision: str, operator: str, reason: str = "") -> None:
         try:

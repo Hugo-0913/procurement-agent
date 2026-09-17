@@ -44,6 +44,7 @@ def seed_demo_data(engine: Engine) -> None:
     today = date.today()
     with Session(engine) as session:
         if session.scalar(select(Material).limit(1)) is not None:
+            _backfill_demo_aliases(session)
             return
 
         material = Material(
@@ -52,6 +53,7 @@ def seed_demo_data(engine: Engine) -> None:
             spec="70g/500张",
             unit="箱",
             category="办公耗材",
+            aliases="A4纸,办公用纸,复印纸,打印纸",
         )
         session.add(material)
         session.flush()
@@ -118,4 +120,16 @@ def seed_demo_data(engine: Engine) -> None:
                 )
 
         _add_purchase_requests(session)
+        session.commit()
+
+
+def _backfill_demo_aliases(session: Session) -> None:
+    """为既有演示数据补齐别名。
+
+    别名是后加的字段，早期建的库不会重跑种子逻辑，这里做一次幂等回填，
+    避免出现"用户说办公用纸、系统说不认识"的情况。
+    """
+    material = session.scalar(select(Material).where(Material.sku == "ST-A4-500"))
+    if material is not None and not material.aliases:
+        material.aliases = "A4纸,办公用纸,复印纸,打印纸"
         session.commit()

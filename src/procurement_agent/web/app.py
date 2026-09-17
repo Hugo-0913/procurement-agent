@@ -41,6 +41,7 @@ def create_app(
     skills_root: Path | None = None,
     eval_runner=None,
     offline_response: str | None = None,
+    offline_script: list[str] | None = None,
 ) -> FastAPI:
     """构造 Web 应用。
 
@@ -61,9 +62,19 @@ def create_app(
     engine = init_db(target_db)
     seed_demo_data(engine)
 
-    model_factory = (
-        offline_model_factory(offline_response) if offline else build_chat_model
-    )
+    if offline:
+        # 离线演示：构造单例模型并让工厂始终返回它。
+        # 传 offline_script 时按顺序消耗脚本（用于验证"先澄清、后补齐"这类多轮场景）。
+        from procurement_agent.agents.offline import OfflineChatModel
+
+        offline_model = OfflineChatModel(
+            default_response=offline_response,
+            script=list(offline_script) if offline_script else None,
+            agent_mode=True,
+        )
+        model_factory = lambda **overrides: offline_model  # noqa: E731
+    else:
+        model_factory = build_chat_model
     faults = FaultRegistry(engine)
     repo = ErpRepository(engine, faults)
     store = TaskStore(engine)

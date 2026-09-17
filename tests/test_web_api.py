@@ -163,8 +163,71 @@ async def test_vague_request_asks_for_clarification(tmp_path, monkeypatch):
     async with await make_client(app) as client:
         created = await client.post("/api/tasks", json={"request_text": "帮我再采购一些纸"})
         task_id = created.json()["task_id"]
-        detail = await wait_for_state(client, task_id, {"PARSING", "COMPLETED", "FAILED"})
-        assert detail["state"] == "PARSING"
+        detail = await wait_for_state(
+            client, task_id, {"AWAITING_CLARIFICATION", "COMPLETED", "FAILED"}
+        )
+        assert detail["state"] == "AWAITING_CLARIFICATION"
+        assert detail["pending_clarification"] is not None
+        assert "数量" in detail["pending_clarification"]["question"]
         assert not [
             e for e in detail["events"] if e["event_type"] == "agent_delegation"
         ]
+
+
+async def test_clarification_endpoint_completes_task(tmp_path, monkeypatch):
+    """补齐缺失信息后，任务应继续跑完并落单。"""
+    import json
+
+    from procurement_agent.web.app import create_app
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    app = create_app(
+        tmp_path / "clarify2.db",
+        offline=True,
+        offline_script=[
+            # 第一次解析：数量缺失，触发澄清
+            json.dumps({"material_name": "A4 纸", "quantity": None}, ensure_ascii=False),
+            # 用户补充后再解析：信息完整
+            json.dumps(
+                {
+                    "material_name": "A4 纸",
+                    "quantity": 50,
+                    "unit": "箱",
+                    "expected_date": None,
+                    "budget": None,
+                    "cost_center": "CC-1001",
+                    "note": None,
+                },
+                ensure_ascii=False,
+            ),
+        ],
+    )
+    async with await make_client(app) as client:
+        created = await client.post("/api/tasks", json={"request_text": "帮我买点办公用纸"})
+        task_id = created.json()["task_id"]
+        detail = await wait_for_state(client, task_id, {"AWAITING_CLARIFICATION"})
+        assert detail["state"] == "AWAITING_CLARIFICATION"
+
+        blank = await client.post(
+            f"/api/tasks/{task_id}/clarification", json={"answer": "   "}
+        )
+        assert blank.status_code == 422
+
+        answered = await client.post(
+            f"/api/tasks/{task_id}/clarification", json={"answer": "50 箱"}
+        )
+        assert answered.status_code == 200
+        finished = await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
+        assert finished["state"] == "COMPLETED"
+        assert "50 箱" in finished["request_text"]
+
+
+async def test_clarification_rejected_when_not_needed(offline_app):
+    async with await make_client(offline_app) as client:
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        task_id = created.json()["task_id"]
+        await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
+        res = await client.post(
+            f"/api/tasks/{task_id}/clarification", json={"answer": "50 箱"}
+        )
+        assert res.status_code == 409

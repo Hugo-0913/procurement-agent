@@ -5,7 +5,7 @@ async function loadData() {
   const rows = await res.json();
   const root = document.getElementById("data-table");
   if (!rows.length) {
-    root.innerHTML = '<p class="hint">暂无数据</p>';
+    root.innerHTML = '<p class="empty">暂无数据</p>';
     return;
   }
   if (currentTab === "suppliers") {
@@ -67,4 +67,3 @@ function bindTabs() {
 bindTabs();
 loadData();
 loadFaults();
-

@@ -7,11 +7,12 @@ const STAGES = [
   { key: "COMPLETED", label: "完成" },
 ];
 const STAGE_ORDER = [
-  "PENDING", "PARSING", "QUALIFYING", "SOURCING", "ORDER_DRAFTING",
+  "PENDING", "PARSING", "AWAITING_CLARIFICATION", "QUALIFYING", "SOURCING", "ORDER_DRAFTING",
   "AWAITING_APPROVAL", "ORDERED", "COMPLETED",
 ];
 const STATE_CLASS = {
   AWAITING_APPROVAL: "orange", REVISION_REQUIRED: "orange",
+  AWAITING_CLARIFICATION: "orange",
   ORDERED: "green", COMPLETED: "green", FAILED: "red",
 };
 
@@ -20,7 +21,9 @@ let lastSeq = 0;
 let started = Date.now();
 
 function renderStageBar(detail) {
-  const currentIndex = STAGE_ORDER.indexOf(detail.state);
+  // 等待澄清时视觉上仍停留在"需求解析"这一步
+  const effectiveState = detail.state === "AWAITING_CLARIFICATION" ? "PARSING" : detail.state;
+  const currentIndex = STAGE_ORDER.indexOf(effectiveState);
   const rejected = detail.events.some(
     (e) => e.event_type === "stage_change" && e.payload.to === "REVISION_REQUIRED"
   );
@@ -108,6 +111,50 @@ function renderAll(detail) {
   if (detail.pending_approval) {
     renderApproval(detail, () => refresh());
   }
+  if (detail.pending_clarification) {
+    renderClarification(detail, () => refresh());
+  }
+}
+
+function renderClarification(detail, onDone) {
+  const existing = document.getElementById("clarify-card");
+  if (existing) existing.remove();
+  const pending = detail.pending_clarification;
+  if (!pending) return;
+
+  const card = document.createElement("div");
+  card.className = "clarify-card";
+  card.id = "clarify-card";
+  card.innerHTML = `
+    <div class="card-head"><span class="badge orange">等待补充信息</span></div>
+    <div class="small">${pending.question}</div>
+    <textarea id="clarify-answer" rows="2" placeholder="例如：50 箱"></textarea>
+    <div class="row">
+      <button id="btn-clarify">提交补充信息</button>
+      <span id="clarify-hint" class="hint"></span>
+    </div>`;
+  document.getElementById("timeline").prepend(card);
+
+  document.getElementById("btn-clarify").onclick = async () => {
+    const answer = document.getElementById("clarify-answer").value.trim();
+    const hint = document.getElementById("clarify-hint");
+    if (!answer) {
+      hint.textContent = "请填写补充信息";
+      return;
+    }
+    hint.textContent = "提交中…";
+    const res = await fetch(`/api/tasks/${detail.id}/clarification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer }),
+    });
+    if (!res.ok) {
+      hint.textContent = "提交失败：" + res.status;
+      return;
+    }
+    card.remove();
+    onDone();
+  };
 }
 
 async function refresh() {
