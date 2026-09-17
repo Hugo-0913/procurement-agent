@@ -30,25 +30,17 @@ class OrderDraft:
     deadline_infeasible: bool = False
 
 
-def run_ordering(
-    repo: ErpRepository,
-    policy: PolicyEngine,
+def build_order_draft(
     sourcing: SourcingOutcome,
     material_id: int,
     quantity: int,
     cost_center: str,
     task_id: str,
-    *,
-    skills: SkillRegistry | None = None,
-) -> tuple[OrderDraft, PolicyDecision]:
-    """由比价结论生成订单草稿并交给策略引擎判定。此函数不写库。"""
-    del repo  # 保留参数以与其他子 Agent 保持统一签名
-    if skills is not None:
-        skills.load("order_compliance")
-
+) -> OrderDraft:
+    """由单个物料的比价结论生成一行订单草稿。不写库、不做策略判定。"""
     recommended = sourcing.recommended
     if recommended is None:
-        raise InsufficientQuotesError()
+        raise InsufficientQuotesError(f"物料 {material_id} 没有可用报价")
 
     total_amount = round(recommended.unit_price * quantity + recommended.freight, 2)
     cheapest = min(
@@ -60,7 +52,7 @@ def run_ordering(
     if cheapest_total > 0 and recommended.supplier_id != cheapest.supplier_id:
         price_gap_ratio = (total_amount - cheapest_total) / cheapest_total
 
-    draft = OrderDraft(
+    return OrderDraft(
         task_id=task_id,
         supplier_id=recommended.supplier_id,
         material_id=material_id,
@@ -75,4 +67,22 @@ def run_ordering(
         insufficient_quotes=bool(sourcing.insufficient_quotes),
         deadline_infeasible=not sourcing.deadline_feasible,
     )
+
+
+def run_ordering(
+    repo: ErpRepository,
+    policy: PolicyEngine,
+    sourcing: SourcingOutcome,
+    material_id: int,
+    quantity: int,
+    cost_center: str,
+    task_id: str,
+    *,
+    skills: SkillRegistry | None = None,
+) -> tuple[OrderDraft, PolicyDecision]:
+    """单物料场景：生成订单草稿并交给策略引擎判定。此函数不写库。"""
+    del repo  # 保留参数以与其他子 Agent 保持统一签名
+    if skills is not None:
+        skills.load("order_compliance")
+    draft = build_order_draft(sourcing, material_id, quantity, cost_center, task_id)
     return draft, policy.check_order(draft)

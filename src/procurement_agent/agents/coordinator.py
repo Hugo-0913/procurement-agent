@@ -21,6 +21,7 @@ from procurement_agent.agents.payloads import (
     qualification_from_payload,
     qualification_to_payload,
     sourcing_from_payload,
+    sourcing_items_to_payload,
     sourcing_to_payload,
 )
 from procurement_agent.agents.response import response_text
@@ -36,16 +37,65 @@ from procurement_agent.state.store import TaskStore
 
 REQUIRED_PARSE_FIELDS = ("material_name", "quantity")
 
+
+def normalize_items(deps: CoordinatorDeps, parsed: dict[str, Any]) -> tuple[list[dict], str | None]:
+    """把解析结果整理成物料清单。
+
+    支持两种形态：模型返回 `items` 列表（多物料），或只返回单组字段（兼容旧行为）。
+    返回 (items, 问题)；问题不为 None 时表示需要向用户澄清。
+    """
+    raw_items = parsed.get("items")
+    if not isinstance(raw_items, list) or not raw_items:
+        raw_items = [
+            {
+                "material_name": parsed.get("material_name"),
+                "quantity": parsed.get("quantity"),
+                "unit": parsed.get("unit"),
+            }
+        ]
+
+    items: list[dict[str, Any]] = []
+    for entry in raw_items:
+        name = entry.get("material_name")
+        quantity = entry.get("quantity")
+        if not name or not quantity:
+            return [], "需求里缺少物料名称或数量，请补充后我再继续比价与下单。"
+        material = deps.repo.find_material_by_name(str(name))
+        if material is None:
+            return [], f"物料主数据中找不到「{name}」，请确认物料名称。"
+        items.append(
+            {
+                "material_id": material.id,
+                "material_name": material.name,
+                "quantity": int(quantity),
+                "unit": entry.get("unit") or material.unit,
+            }
+        )
+    return items, None
+
+# 注意：提示词里含 JSON 示例，必须用 replace 渲染而**不能用 str.format**，
+# 否则示例中的花括号会被当成格式化占位符（曾因此抛 KeyError: '"items"'）。
 PARSE_PROMPT = """你是采购需求解析器。请把下面的采购需求解析为 JSON。
 只输出 JSON，不要输出任何解释文字。
 
-字段要求：material_name（必填）、quantity（必填，整数）、unit、expected_date、
+单种物料时输出：material_name（必填）、quantity（必填，整数）、unit、expected_date、
 budget、cost_center、note。缺失的可选字段填 null，禁止猜测未提及的信息。
+
+需求包含多种物料时，改为输出 items 数组，每种物料一个元素：
+{"items":[{"material_name":"...","quantity":10,"unit":"..."}, ...],
+ "expected_date":null,"budget":null,"cost_center":"...","note":null}
+不要在 items 之外重复输出 material_name 与 quantity。
 
 {skill_index}
 
 采购需求：{request_text}
 """
+
+
+def build_parse_prompt(skill_index: str, request_text: str) -> str:
+    return PARSE_PROMPT.replace("{skill_index}", skill_index).replace(
+        "{request_text}", request_text
+    )
 
 
 @dataclass
@@ -189,10 +239,7 @@ def build_handlers(deps: CoordinatorDeps):
 
         record = deps.store.get_task(task_id)
         model = deps.model_factory()
-        prompt = PARSE_PROMPT.format(
-            skill_index=deps.skills.render_index(),
-            request_text=record.request_text,
-        )
+        prompt = build_parse_prompt(deps.skills.render_index(), record.request_text)
         _event(deps, task_id, "coordinator", "tool_call", {"tool": "requirement_parser"})
 
         def parse_once() -> dict[str, Any]:
@@ -216,56 +263,43 @@ def build_handlers(deps: CoordinatorDeps):
             {"tool": "requirement_parser", "summary": "已解析采购要素"},
         )
 
-        missing = [field for field in REQUIRED_PARSE_FIELDS if not parsed.get(field)]
-        if missing:
-            fields = "、".join("物料名称" if f == "material_name" else "数量" for f in missing)
-            question = f"需求里缺少{fields}，请补充后我再继续比价与下单。"
+        items, problem = normalize_items(deps, parsed)
+        if problem is not None:
+            missing = [
+                field
+                for field in REQUIRED_PARSE_FIELDS
+                if not parsed.get(field) and "找不到" not in problem
+            ]
             _event(
                 deps,
                 task_id,
                 "coordinator",
                 "clarification_requested",
-                {"question": question, "missing": missing},
+                {"question": problem, "missing": missing},
             )
             return StageResult(
                 state=TaskState.AWAITING_CLARIFICATION,
                 payload={
                     "needs_clarification": True,
-                    "question": question,
+                    "question": problem,
                     "missing_fields": missing,
                     "structured_request": parsed,
                 },
             )
 
-        material = deps.repo.find_material_by_name(str(parsed["material_name"]))
-        if material is None:
-            question = f"物料主数据中找不到「{parsed['material_name']}」，请确认物料名称。"
-            _event(
-                deps,
-                task_id,
-                "coordinator",
-                "clarification_requested",
-                {"question": question, "missing": ["material_name"]},
-            )
-            return StageResult(
-                state=TaskState.AWAITING_CLARIFICATION,
-                payload={
-                    "needs_clarification": True,
-                    "question": question,
-                    "missing_fields": ["material_name"],
-                    "structured_request": parsed,
-                },
-            )
-
-        deps.store.set_structured_request(task_id, parsed)
+        first = items[0]
+        # 同时保存归一化后的物料清单，供页面展示与后续追溯
+        deps.store.set_structured_request(task_id, {**parsed, "items": items})
         return StageResult(
             state=TaskState.PARSING,
             payload={
                 "needs_clarification": False,
                 "structured_request": parsed,
-                "material_id": material.id,
-                "material_name": material.name,
-                "quantity": int(parsed["quantity"]),
+                "items": items,
+                "item_count": len(items),
+                "material_id": first["material_id"],
+                "material_name": first["material_name"],
+                "quantity": first["quantity"],
                 "cost_center": parsed.get("cost_center") or "CC-1001",
                 "expected_date": parsed.get("expected_date"),
                 "loaded_skills": sorted(loaded),
@@ -309,11 +343,11 @@ def build_handlers(deps: CoordinatorDeps):
             "请委派比价分析子 Agent 在合格供应商之间比价并给出推荐与理由。",
             "sourcing",
         )
-        outcome = task_context.results["sourcing"]
+        sourcing_items = task_context.results["sourcing_items"]
         result = StageResult(
             state=TaskState.SOURCING,
             payload={
-                "sourcing": sourcing_to_payload(outcome),
+                "sourcing": sourcing_items_to_payload(sourcing_items),
                 "loaded_skills": sorted(task_context.loaded_skills),
             },
         )
@@ -322,7 +356,13 @@ def build_handlers(deps: CoordinatorDeps):
                 deps,
                 task_id,
                 context,
-                {"step": "sourcing", "comparisons": len(outcome.comparisons)},
+                {
+                    "step": "sourcing",
+                    "items": len(sourcing_items),
+                    "comparisons": sum(
+                        len(item["outcome"].comparisons) for item in sourcing_items
+                    ),
+                },
                 {"quantity": context.get("quantity"), "material": context.get("material_name")},
             )
         )
@@ -337,12 +377,13 @@ def build_handlers(deps: CoordinatorDeps):
             "请委派订单执行子 Agent 生成订单草稿并判断是否需要人工审批。",
             "draft",
         )
-        draft = task_context.results["draft"]
+        drafts = task_context.results["drafts"]
         decision = task_context.results["decision"]
         result = StageResult(
             state=TaskState.ORDER_DRAFTING,
             payload={
-                "draft": draft_to_payload(draft),
+                "drafts": [draft_to_payload(draft) for draft in drafts],
+                "draft": draft_to_payload(drafts[0]),
                 "needs_approval": decision.requires_approval,
                 "matched_rules": list(decision.matched_rules),
                 "loaded_skills": sorted(task_context.loaded_skills),
@@ -353,7 +394,11 @@ def build_handlers(deps: CoordinatorDeps):
                 deps,
                 task_id,
                 context,
-                {"step": "order_draft", "total": draft.total_amount},
+                {
+                    "step": "order_draft",
+                    "lines": len(drafts),
+                    "total": round(sum(item.total_amount for item in drafts), 2),
+                },
                 {"quantity": context.get("quantity"), "material": context.get("material_name")},
             )
         )
@@ -361,31 +406,37 @@ def build_handlers(deps: CoordinatorDeps):
 
     def ordering(task_id: str, context: dict[str, Any]) -> StageResult:
         target = agents.subagents["ordering"].name
-        draft = payload_to_draft(context["draft"])
+        drafts = [payload_to_draft(item) for item in context["drafts"]]
         if (
             context.get("sourcing", {}).get("insufficient_quotes")
             and deps.config.single_quote_policy == "fail"
         ):
             raise InsufficientQuotesError()
-        order_id = deps.repo.create_order(draft)
-        deps.repo.record_price(draft.supplier_id, draft.material_id, draft.unit_price)
+        order_ids: list[int] = []
+        for draft in drafts:
+            order_ids.append(deps.repo.create_order(draft))
+            deps.repo.record_price(draft.supplier_id, draft.material_id, draft.unit_price)
         _event(
             deps,
             task_id,
             target,
             "tool_result",
-            {"tool": "order_create", "order_id": order_id},
+            {"tool": "order_create", "order_id": order_ids[0], "order_ids": order_ids},
         )
         if deps.memory is not None:
-            supplier = deps.repo.supplier(draft.supplier_id)
-            deps.memory.record_order_outcome(
-                supplier_code=supplier.code if supplier else str(draft.supplier_id),
-                sku=str(context.get("material_name", "")),
-                unit_price=draft.unit_price,
-                approved=True,
-            )
+            for draft in drafts:
+                supplier = deps.repo.supplier(draft.supplier_id)
+                deps.memory.record_order_outcome(
+                    supplier_code=supplier.code if supplier else str(draft.supplier_id),
+                    sku=str(context.get("material_name", "")),
+                    unit_price=draft.unit_price,
+                    approved=True,
+                )
             _event(deps, task_id, "coordinator", "memory_written", {"sku": context.get("material_name")})
-        return StageResult(state=TaskState.ORDERED, payload={"order_id": order_id})
+        return StageResult(
+            state=TaskState.ORDERED,
+            payload={"order_id": order_ids[0], "order_ids": order_ids},
+        )
 
     return {
         TaskState.PARSING: parsing,

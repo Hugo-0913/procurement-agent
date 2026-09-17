@@ -19,13 +19,15 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from procurement_agent.agents.ordering import run_ordering
+from procurement_agent.agents.ordering import build_order_draft
 from procurement_agent.agents.payloads import (
+    draft_to_payload,
     qualification_from_payload,
     qualification_to_payload,
     sourcing_from_payload,
+    sourcing_items_from_payload,
+    sourcing_items_to_payload,
     sourcing_to_payload,
-    draft_to_payload,
 )
 from procurement_agent.agents.qualification import run_qualification
 from procurement_agent.agents.sourcing import run_sourcing
@@ -147,7 +149,7 @@ def qualification_query() -> str:
 
 
 def quote_query() -> str:
-    """在合格供应商之间比价，返回比价明细与推荐的 JSON。"""
+    """对需求中的每种物料分别比价，返回多物料比价结果的 JSON。"""
     context = _ctx()
     _emit(context, SOURCING_AGENT, "tool_call", {"tool": "quote_query"})
     _load_skill(context, SOURCING_AGENT, "price_comparison")
@@ -155,24 +157,32 @@ def quote_query() -> str:
     qualified = context.results.get("qualification")
     if qualified is None:
         qualified = qualification_from_payload(context.state["qualification"])
-    outcome = run_sourcing(
-        context.repo,
-        context.config,
-        int(context.state["material_id"]),
-        int(context.state["quantity"]),
-        qualified,
-        expected_date=context.state.get("expected_date"),
-    )
-    context.results["sourcing"] = outcome
-    payload = sourcing_to_payload(outcome)
+
+    items = _items_of(context)
+    results = [
+        {
+            **item,
+            "outcome": run_sourcing(
+                context.repo,
+                context.config,
+                int(item["material_id"]),
+                int(item["quantity"]),
+                qualified,
+                expected_date=context.state.get("expected_date"),
+            ),
+        }
+        for item in items
+    ]
+    context.results["sourcing_items"] = results
+    payload = sourcing_items_to_payload(results)
     _emit(
         context,
         SOURCING_AGENT,
         "tool_result",
         {
             "tool": "quote_query",
-            "summary": outcome.reason,
-            "comparisons": len(outcome.comparisons),
+            "summary": payload["reason"],
+            "comparisons": sum(len(item["outcome"].comparisons) for item in results),
             "detail": payload,
         },
     )
@@ -180,29 +190,27 @@ def quote_query() -> str:
 
 
 def order_draft() -> str:
-    """生成订单草稿并判定是否需要人工审批，返回草稿与决策的 JSON。"""
+    """为每种物料生成一行订单草稿，按合计金额判定是否需要人工审批。"""
     context = _ctx()
     _emit(context, ORDERING_AGENT, "tool_call", {"tool": "order_draft"})
     _load_skill(context, ORDERING_AGENT, "order_compliance")
 
-    sourcing = context.results.get("sourcing")
-    if sourcing is None:
-        sourcing = sourcing_from_payload(context.state["sourcing"])
-    draft, decision = run_ordering(
-        context.repo,
-        context.policy,
-        sourcing,
-        int(context.state["material_id"]),
-        int(context.state["quantity"]),
-        str(context.state.get("cost_center") or "CC-1001"),
-        context.task_id,
-    )
-    context.results["draft"] = draft
+    items = _items_of(context)
+    outcomes = sourcing_items_from_payload(context.state["sourcing"])
+    cost_center = str(context.state.get("cost_center") or "CC-1001")
+    drafts = [
+        build_order_draft(outcome, int(item["material_id"]),
+                          int(item["quantity"]), cost_center, context.task_id)
+        for item, outcome in zip(items, outcomes)
+    ]
+    decision = context.policy.check_lines(drafts)
+    context.results["drafts"] = drafts
     context.results["decision"] = decision
     payload = {
-        "draft": draft_to_payload(draft),
+        "drafts": [draft_to_payload(draft) for draft in drafts],
         "requires_approval": decision.requires_approval,
         "matched_rules": list(decision.matched_rules),
+        "total_amount": round(sum(draft.total_amount for draft in drafts), 2),
     }
     _emit(
         context,
@@ -210,14 +218,31 @@ def order_draft() -> str:
         "tool_result",
         {
             "tool": "order_draft",
-            "summary": f"订单草稿 ¥{draft.total_amount:.2f}",
+            "summary": f"订单草稿 {len(drafts)} 行，合计 ¥{payload['total_amount']:.2f}",
             "requires_approval": decision.requires_approval,
-            "draft": payload["draft"],
+            "draft": payload["drafts"][0],
+            "drafts": payload["drafts"],
             "matched_rules": payload["matched_rules"],
-            "recommendation_reason": sourcing.reason,
+            "recommendation_reason": "；".join(
+                outcome.reason for outcome in outcomes if outcome.reason
+            ),
         },
     )
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _items_of(context: TaskContext) -> list[dict[str, Any]]:
+    """取需求中的物料清单；兼容只有单物料的旧任务。"""
+    items = context.state.get("items")
+    if items:
+        return list(items)
+    return [
+        {
+            "material_id": context.state["material_id"],
+            "material_name": context.state.get("material_name"),
+            "quantity": context.state["quantity"],
+        }
+    ]
 
 
 TOOL_BY_NAME: dict[str, Callable[[], str]] = {

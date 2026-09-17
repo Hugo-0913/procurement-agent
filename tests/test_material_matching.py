@@ -36,7 +36,7 @@ def test_sku_matches(tmp_path):
 def test_different_spec_does_not_match(tmp_path):
     repo = make_repo(tmp_path)
     assert repo.find_material_by_name("A5 纸") is None
-    assert repo.find_material_by_name("订书机") is None
+    assert repo.find_material_by_name("投影仪") is None
 
 
 def test_blank_input_returns_none(tmp_path):

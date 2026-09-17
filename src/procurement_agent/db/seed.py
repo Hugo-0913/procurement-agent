@@ -45,6 +45,7 @@ def seed_demo_data(engine: Engine) -> None:
     with Session(engine) as session:
         if session.scalar(select(Material).limit(1)) is not None:
             _backfill_demo_aliases(session)
+            _ensure_stapler(session)
             return
 
         material = Material(
@@ -56,6 +57,17 @@ def seed_demo_data(engine: Engine) -> None:
             aliases="A4纸,办公用纸,复印纸,打印纸",
         )
         session.add(material)
+        session.flush()
+
+        stapler = Material(
+            sku="ST-STAPLER-24",
+            name="订书机",
+            spec="12号/24页",
+            unit="个",
+            category="办公耗材",
+            aliases="订书器,stapler",
+        )
+        session.add(stapler)
         session.flush()
 
         suppliers = [
@@ -86,15 +98,18 @@ def seed_demo_data(engine: Engine) -> None:
             )
 
         quote_rows = [
-            ("SUP-A", 21.5, 0.0, 3),
-            ("SUP-B", 19.8, 120.0, 5),
-            ("SUP-C", 20.2, 0.0, 2),
+            ("SUP-A", 21.5, 0.0, 3, material.id),
+            ("SUP-B", 19.8, 120.0, 5, material.id),
+            ("SUP-C", 20.2, 0.0, 2, material.id),
+            ("SUP-A", 18.6, 0.0, 3, stapler.id),
+            ("SUP-B", 16.9, 120.0, 5, stapler.id),
+            ("SUP-C", 19.4, 0.0, 2, stapler.id),
         ]
-        for code, unit_price, freight, lead_days in quote_rows:
+        for code, unit_price, freight, lead_days, material_id in quote_rows:
             session.add(
                 Quote(
                     supplier_id=by_code[code].id,
-                    material_id=material.id,
+                    material_id=material_id,
                     unit_price=unit_price,
                     freight=freight,
                     lead_days=lead_days,
@@ -133,3 +148,49 @@ def _backfill_demo_aliases(session: Session) -> None:
     if material is not None and not material.aliases:
         material.aliases = "A4纸,办公用纸,复印纸,打印纸"
         session.commit()
+
+
+def _ensure_stapler(session: Session) -> None:
+    """为既有演示库补上第二种物料，使多物料采购可以演示（幂等）。"""
+    if session.scalar(select(Material).where(Material.sku == "ST-STAPLER-24")):
+        return
+    today = date.today()
+    stapler = Material(
+        sku="ST-STAPLER-24",
+        name="订书机",
+        spec="12号/24页",
+        unit="个",
+        category="办公耗材",
+        aliases="订书器,stapler",
+    )
+    session.add(stapler)
+    session.flush()
+    for code, unit_price, freight, lead_days in (
+        ("SUP-A", 18.6, 0.0, 3),
+        ("SUP-B", 16.9, 120.0, 5),
+        ("SUP-C", 19.4, 0.0, 2),
+    ):
+        supplier = session.scalar(select(Supplier).where(Supplier.code == code))
+        if supplier is None:
+            continue
+        session.add(
+            Quote(
+                supplier_id=supplier.id,
+                material_id=stapler.id,
+                unit_price=unit_price,
+                freight=freight,
+                lead_days=lead_days,
+                valid_until=today + timedelta(days=30),
+                available=True,
+            )
+        )
+        for index, price in enumerate((unit_price - 0.2, unit_price, unit_price + 0.1)):
+            session.add(
+                PriceHistory(
+                    supplier_id=supplier.id,
+                    material_id=stapler.id,
+                    unit_price=round(price, 2),
+                    ordered_at=today - timedelta(days=30 * (index + 1)),
+                )
+            )
+    session.commit()

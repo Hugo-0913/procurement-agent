@@ -59,11 +59,27 @@ function renderStageBar(detail) {
 function renderLeft(detail) {
   document.getElementById("request-text").textContent = detail.request_text;
   const structured = detail.structured_request || {};
-  document.getElementById("structured").innerHTML = Object.keys(structured).length
+  const items = detail.request_items || [];
+  let structuredHtml = "";
+  if (items.length) {
+    structuredHtml =
+      `<tr><td>物料</td><td>${items.length} 种</td></tr>` +
+      items
+        .map(
+          (item) =>
+            `<tr><td>· ${item.material_name}</td><td>${item.quantity} ${item.unit || ""}</td></tr>`
+        )
+        .join("");
+  }
+  structuredHtml += Object.keys(structured).length
     ? Object.entries(structured)
+        .filter(([k]) => k !== "items")
         .map(([k, v]) => `<tr><td>${k}</td><td>${v ?? "-"}</td></tr>`)
         .join("")
+    : items.length
+    ? ""
     : '<tr><td colspan="2" class="hint">尚未解析</td></tr>';
+  document.getElementById("structured").innerHTML = structuredHtml;
   document.getElementById("memory-block").textContent = detail.memory_block || "";
 
   document.getElementById("skill-status").innerHTML = [

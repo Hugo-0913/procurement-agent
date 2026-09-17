@@ -119,9 +119,16 @@ def build_task_detail(ctx: WebContext, task_id: str) -> dict[str, Any]:
             ),
             {},
         )
+        order_lines = draft_event.get("drafts") or (
+            [draft_event["draft"]] if draft_event.get("draft") else []
+        )
         pending = {
             "matched_rules": requested.get("matched_rules", []),
-            "order_draft": draft_event.get("draft"),
+            "order_draft": order_lines[0] if order_lines else None,
+            "order_lines": order_lines,
+            "total_amount": round(
+                sum(line.get("total_amount", 0) for line in order_lines), 2
+            ),
             "recommendation_reason": draft_event.get("recommendation_reason", ""),
         }
 
@@ -145,6 +152,7 @@ def build_task_detail(ctx: WebContext, task_id: str) -> dict[str, Any]:
         "state": record.state.value,
         "state_label": STAGE_LABELS[record.state],
         "structured_request": record.structured_request,
+        "request_items": (record.structured_request or {}).get("items", []),
         "created_at": record.created_at,
         "updated_at": record.updated_at,
         "finished_at": record.finished_at,

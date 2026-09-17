@@ -5,23 +5,38 @@ function renderApproval(detail, onDone) {
   if (!pending) return;
 
   const draft = pending.order_draft || {};
+  const lines = pending.order_lines && pending.order_lines.length
+    ? pending.order_lines
+    : [draft];
   const rules = (pending.matched_rules || [])
     .map((r) => `<div class="rule">命中规则：${r}</div>`)
     .join("");
   const card = document.createElement("div");
   card.className = "approval-card";
   card.id = "approval-card";
+  const lineRows = lines
+    .map(
+      (line) => `<tr>
+        <td>${line.supplier_name || "-"}</td>
+        <td>${line.quantity ?? "-"}</td>
+        <td>¥${(line.unit_price ?? 0).toFixed(2)}</td>
+        <td>¥${(line.total_amount ?? 0).toFixed(2)}</td>
+        <td>${line.lead_days ?? "-"} 天</td>
+      </tr>`
+    )
+    .join("");
+  const total = pending.total_amount ?? (draft.total_amount || 0);
+
   card.innerHTML = `
-    <div><strong>需要人工审批</strong></div>
+    <div class="card-head"><span class="badge orange">需要人工审批</span></div>
     ${rules}
-    <table class="kv" style="margin-top:8px">
-      <tr><td>供应商</td><td>${draft.supplier_name || "-"}</td></tr>
-      <tr><td>数量</td><td>${draft.quantity ?? "-"}</td></tr>
-      <tr><td>单价</td><td>¥${(draft.unit_price ?? 0).toFixed(2)}</td></tr>
-      <tr><td>总额</td><td>¥${(draft.total_amount ?? 0).toFixed(2)}</td></tr>
-      <tr><td>交期</td><td>${draft.lead_days ?? "-"} 天</td></tr>
-      <tr><td>成本中心</td><td>${draft.cost_center || "-"}</td></tr>
+    <table class="data" style="margin-top:10px">
+      <tr><th>供应商</th><th>数量</th><th>单价</th><th>小计</th><th>交期</th></tr>
+      ${lineRows}
+      <tr><td colspan="3"><strong>合计（${lines.length} 行）</strong></td>
+          <td colspan="2"><strong>¥${Number(total).toFixed(2)}</strong></td></tr>
     </table>
+    <div class="hint" style="margin-top:6px">成本中心：${draft.cost_center || "-"}</div>
     <div class="small" style="margin-top:8px">比价结论：${pending.recommendation_reason || "-"}</div>
     <textarea id="approval-reason" rows="2" placeholder="审批意见（驳回或要求修改时必填）"></textarea>
     <div class="row">
@@ -56,4 +71,3 @@ function renderApproval(detail, onDone) {
   document.getElementById("btn-reject").onclick = () => send("reject");
   document.getElementById("btn-revise").onclick = () => send("revise");
 }
-

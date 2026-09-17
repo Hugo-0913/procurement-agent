@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, Sequence
 
 from procurement_agent.config import ProcurementConfig
 
@@ -32,21 +32,37 @@ class PolicyEngine:
     extra_rules: tuple[str, ...] = field(default=())
 
     def check_order(self, draft: OrderDraftLike) -> PolicyDecision:
+        """单行订单校验，等价于只含一行的订单。"""
+        return self.check_lines([draft])
+
+    def check_lines(self, lines: Sequence[OrderDraftLike]) -> PolicyDecision:
+        """按订单行集合校验。
+
+        多物料采购会产生多行，规则口径如下：
+        - 金额：按**合计金额**与阈值比较，而不是逐行比较；
+        - 临期 / 交期 / 报价不足：任一行命中即需人工确认；
+        - 非最低价：任一行差额超过阈值即需人工确认。
+        """
+        if not lines:
+            return PolicyDecision(allowed=True, requires_approval=False)
+
         matched: list[str] = []
-        if draft.total_amount > self.config.approval_threshold:
+        total_amount = sum(line.total_amount for line in lines)
+        if total_amount > self.config.approval_threshold:
             matched.append(
-                f"订单金额 ¥{draft.total_amount:.2f} > 阈值 "
+                f"订单金额 ¥{total_amount:.2f} > 阈值 "
                 f"¥{self.config.approval_threshold:.2f}"
             )
-        if draft.supplier_expiring_soon:
+        if any(line.supplier_expiring_soon for line in lines):
             matched.append("供应商资质临期，需要人工确认")
-        if draft.price_gap_ratio > PRICE_GAP_THRESHOLD:
+        worst_gap = max((line.price_gap_ratio for line in lines), default=0.0)
+        if worst_gap > PRICE_GAP_THRESHOLD:
             matched.append(
-                f"推荐结果非最低价，差额比例 {draft.price_gap_ratio:.1%} 超过 10%"
+                f"推荐结果非最低价，差额比例 {worst_gap:.1%} 超过 10%"
             )
-        if draft.insufficient_quotes:
+        if any(line.insufficient_quotes for line in lines):
             matched.append("可用报价不足，无法完成比价，需人工确认")
-        if draft.deadline_infeasible:
+        if any(line.deadline_infeasible for line in lines):
             matched.append("交期无法满足期望到货日期，需人工确认")
 
         if not matched:
