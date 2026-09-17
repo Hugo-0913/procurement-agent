@@ -1,0 +1,16 @@
+deepagents
+langgraph
+langgraph-checkpoint-sqlite
+langchain-deepseek
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+pydantic>=2
+pydantic-settings
+pyyaml
+jinja2
+
+[dev]
+pytest
+pytest-asyncio
+httpx

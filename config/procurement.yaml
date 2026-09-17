@@ -1,0 +1,6 @@
+approval_threshold: 50000
+retry_max_attempts: 3
+context_token_threshold: 12000
+min_quote_count: 2
+freshness_warn_days: 30
+

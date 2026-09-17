@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: procurement-agent
+Version: 0.1.0
+Requires-Python: >=3.11
+Requires-Dist: deepagents
+Requires-Dist: langgraph
+Requires-Dist: langgraph-checkpoint-sqlite
+Requires-Dist: langchain-deepseek
+Requires-Dist: fastapi
+Requires-Dist: uvicorn[standard]
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: pydantic>=2
+Requires-Dist: pydantic-settings
+Requires-Dist: pyyaml
+Requires-Dist: jinja2
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: httpx; extra == "dev"
