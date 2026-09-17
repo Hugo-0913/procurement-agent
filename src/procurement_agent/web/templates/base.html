@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}耗材采购自动化 Agent{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topnav">
+    <span class="brand">耗材采购自动化 Agent</span>
+    <nav>
+      <a href="/" class="{% if nav == 'board' %}active{% endif %}">任务看板</a>
+      <a href="/data" class="{% if nav == 'data' %}active{% endif %}">数据台</a>
+      <a href="/eval" class="{% if nav == 'eval' %}active{% endif %}">评测</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+

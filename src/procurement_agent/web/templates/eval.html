@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}评测 · 耗材采购自动化 Agent{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="row">
+    <button id="eval-run">运行评测</button>
+    <span id="eval-status" class="hint"></span>
+  </div>
+  <div id="eval-metrics" class="cards"></div>
+</section>
+<section class="panel">
+  <h3>失败用例</h3>
+  <div id="eval-failures"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/eval.js"></script>
+{% endblock %}
+

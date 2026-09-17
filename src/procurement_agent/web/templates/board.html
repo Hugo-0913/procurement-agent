@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}任务看板 · 耗材采购自动化 Agent{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>新建采购需求</h2>
+  <textarea id="request-text" rows="3" placeholder="例如：采购 50 箱 A4 纸，下周一前到货，成本中心 CC-1001"></textarea>
+  <div class="row">
+    <button id="btn-submit">提交需求</button>
+    <button id="btn-sample" class="ghost">填入示例需求</button>
+    <span id="submit-hint" class="hint"></span>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="row" id="status-filters">
+    <button class="chip active" data-state="">全部</button>
+    <button class="chip" data-state="RUNNING">运行中</button>
+    <button class="chip" data-state="AWAITING_APPROVAL">等待审批</button>
+    <button class="chip" data-state="COMPLETED">已完成</button>
+    <button class="chip" data-state="FAILED">失败</button>
+  </div>
+  <div id="task-list" class="cards"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/board.js"></script>
+{% endblock %}
+

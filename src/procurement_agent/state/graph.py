@@ -161,6 +161,11 @@ class TaskRunner:
 
     def start(self, request_text: str) -> str:
         task_id = self.store.create_task(request_text)
+        self.run(task_id, request_text)
+        return task_id
+
+    def run(self, task_id: str, request_text: str) -> None:
+        """在已创建的任务上执行流程（供后台线程调用）。"""
         self.store.transition(task_id, TaskState.PARSING)
         try:
             self.graph.invoke(
@@ -175,7 +180,6 @@ class TaskRunner:
             )
         except Exception as exc:  # noqa: BLE001
             self._fail(task_id, exc)
-        return task_id
 
     def resume(self, task_id: str, decision: str, operator: str, reason: str = "") -> None:
         try:

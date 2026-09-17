@@ -249,6 +249,7 @@ def build_handlers(deps: CoordinatorDeps):
                 "tool": "quote_query",
                 "summary": outcome.reason,
                 "comparisons": len(outcome.comparisons),
+                "detail": sourcing_to_payload(outcome),
             },
         )
         result = StageResult(
@@ -294,6 +295,9 @@ def build_handlers(deps: CoordinatorDeps):
                 "tool": "order_draft",
                 "summary": f"订单草稿 ¥{draft.total_amount:.2f}",
                 "requires_approval": decision.requires_approval,
+                "draft": draft_to_payload(draft),
+                "matched_rules": list(decision.matched_rules),
+                "recommendation_reason": sourcing_outcome.reason,
             },
         )
         result = StageResult(

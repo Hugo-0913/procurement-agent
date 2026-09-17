@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}数据台 · 耗材采购自动化 Agent{% endblock %}
+{% block content %}
+<div class="grid2">
+  <section class="panel">
+    <div class="row">
+      <button class="chip active" id="tab-suppliers">供应商</button>
+      <button class="chip" id="tab-quotes">报价</button>
+      <button class="chip" id="tab-orders">订单</button>
+    </div>
+    <div id="data-table"></div>
+  </section>
+
+  <section class="panel" id="fault-panel">
+    <h3>故障注入</h3>
+    <p class="hint">打开开关后回到执行页重新发起任务，可演示异常处理路径。</p>
+    <div id="fault-list">
+      {% for flag in fault_flags %}
+      <label class="switch">
+        <input type="checkbox" data-flag="{{ flag.flag }}" {% if flag.enabled %}checked{% endif %}>
+        <span>{{ flag.label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/data.js"></script>
+{% endblock %}

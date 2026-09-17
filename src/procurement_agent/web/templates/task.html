@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}采购执行 · 耗材采购自动化 Agent{% endblock %}
+{% block content %}
+<div id="stage-bar" class="stage-bar">
+  <span class="stage" data-stage="PARSING">需求解析</span>
+  <span class="hint">→</span>
+  <span class="stage" data-stage="QUALIFYING">资质核验</span>
+  <span class="hint">→</span>
+  <span class="stage" data-stage="SOURCING">比价分析</span>
+  <span class="hint">→</span>
+  <span class="stage" data-stage="AWAITING_APPROVAL">订单审批</span>
+  <span class="hint">→</span>
+  <span class="stage" data-stage="COMPLETED">完成</span>
+  <span id="stage-meta"></span>
+</div>
+
+<div class="grid3">
+  <aside id="left-panel" class="panel">
+    <h3>采购需求</h3>
+    <p id="request-text" class="small"></p>
+    <h3>结构化要素</h3>
+    <table id="structured" class="kv"></table>
+    <h3>已加载记忆</h3>
+    <pre id="memory-block" class="small pre"></pre>
+    <h3>技能状态</h3>
+    <div id="skill-status" class="tags"></div>
+  </aside>
+
+  <section class="panel">
+    <div id="result-card" class="result-card hidden"></div>
+    <h3>任务树</h3>
+    <div id="task-tree" class="tree"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="row">
+      <h3>执行时间线</h3>
+      <select id="filter-agent" class="mini"><option value="">全部 Agent</option></select>
+      <select id="filter-type" class="mini"><option value="">全部事件</option></select>
+    </div>
+    <div id="timeline" class="timeline"></div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.TASK_ID = "{{ task_id }}";</script>
+<script src="/static/tree.js"></script>
+<script src="/static/timeline.js"></script>
+<script src="/static/approval.js"></script>
+<script src="/static/task.js"></script>
+{% endblock %}
