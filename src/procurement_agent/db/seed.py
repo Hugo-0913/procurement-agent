@@ -86,7 +86,7 @@ def seed_demo_data(engine: Engine) -> None:
         quote_rows = [
             ("SUP-A", 21.5, 0.0, 3),
             ("SUP-B", 19.8, 120.0, 5),
-            ("SUP-C", 23.0, 0.0, 2),
+            ("SUP-C", 20.2, 0.0, 2),
         ]
         for code, unit_price, freight, lead_days in quote_rows:
             session.add(
@@ -104,7 +104,7 @@ def seed_demo_data(engine: Engine) -> None:
         history_rows = {
             "SUP-A": (21.2, 21.8, 21.5),
             "SUP-B": (19.5, 20.0, 19.9),
-            "SUP-C": (22.8, 23.1, 22.9),
+            "SUP-C": (20.0, 20.3, 20.2),
         }
         for code, prices in history_rows.items():
             for index, price in enumerate(prices):
