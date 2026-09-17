@@ -41,7 +41,8 @@ def test_model_returns_json_for_parse_prompt():
 
 
 def test_model_returns_summary_for_summary_prompt():
-    model = OfflineModel(default_response=None)
+    # 摘要识别属于 Agent 模式的行为（应用里由 offline_model_factory 统一开启）
+    model = OfflineModel(default_response=None, agent_mode=True)
     payload = response_text(
         model.invoke([{"role": "user", "content": "请把以下对话压缩为不超过 3 行的中文摘要"}])
     )

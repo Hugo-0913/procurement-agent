@@ -5,8 +5,15 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from procurement_agent.agents.config import AgentsConfig
+from procurement_agent.agents.delegation import (
+    ORDERING_AGENT,
+    QUALIFICATION_AGENT,
+    SOURCING_AGENT,
+    DelegationRuntime,
+    TaskContext,
+)
 from procurement_agent.agents.model import build_chat_model
-from procurement_agent.agents.ordering import InsufficientQuotesError, run_ordering
+from procurement_agent.agents.ordering import InsufficientQuotesError
 from procurement_agent.agents.payloads import (
     draft_to_payload,
     payload_to_draft,
@@ -15,12 +22,10 @@ from procurement_agent.agents.payloads import (
     sourcing_from_payload,
     sourcing_to_payload,
 )
-from procurement_agent.agents.qualification import run_qualification
 from procurement_agent.agents.response import response_text
-from procurement_agent.agents.sourcing import run_sourcing
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.erp.repository import ErpRepository
-from procurement_agent.middleware.reflection_retry import run_with_retry
+from procurement_agent.middleware.reflection_retry import RetryExhausted, run_with_retry
 from procurement_agent.sandbox.policy import PolicyEngine
 from procurement_agent.skills_loader import SkillRegistry
 from procurement_agent.state.models import TaskState
@@ -127,6 +132,49 @@ def _track_context(
 
 def build_handlers(deps: CoordinatorDeps):
     agents = deps.agents_config
+    runtime = DelegationRuntime(deps.model_factory, agents)
+
+    def run_delegated(
+        task_id: str,
+        context: dict[str, Any],
+        subagent: str,
+        tool_name: str,
+        instruction: str,
+        result_key: str,
+    ) -> TaskContext:
+        """委派子 Agent 执行一个阶段；模型未调用 task 工具时降级为直接执行。"""
+        task_context = TaskContext(
+            task_id=task_id,
+            store=deps.store,
+            repo=deps.repo,
+            config=deps.config,
+            policy=deps.policy,
+            skills=deps.skills,
+            state=dict(context),
+        )
+        _delegate(deps, task_id, subagent)
+        mode = "fallback"
+        try:
+            mode = _call_subagent(
+                deps,
+                task_id,
+                subagent,
+                lambda: runtime.delegate(task_context, subagent, instruction),
+            )
+        except RetryExhausted as exc:
+            task_context.store.append_event(
+                task_id,
+                "coordinator",
+                "delegation_result",
+                {
+                    "to": subagent,
+                    "mode": "fallback",
+                    "reason": f"委派失败：{type(exc.last_error).__name__}",
+                },
+            )
+        if mode == "fallback" or result_key not in task_context.results:
+            runtime.run_tool_directly(task_context, tool_name)
+        return task_context
 
     def parsing(task_id: str, context: dict[str, Any]) -> StageResult:
         if deps.memory is not None:
@@ -194,26 +242,15 @@ def build_handlers(deps: CoordinatorDeps):
         )
 
     def qualifying(task_id: str, context: dict[str, Any]) -> StageResult:
-        target = agents.subagents["qualification"].name
-        _delegate(deps, task_id, target)
-        _load_skill(deps, task_id, target, "supplier_qualification")
-        _event(deps, task_id, target, "tool_call", {"tool": "supplier_qualification_query"})
-        outcome = _call_subagent(
-            deps,
+        task_context = run_delegated(
             task_id,
-            target,
-            lambda: run_qualification(deps.repo, deps.config, int(context["material_id"])),
+            context,
+            agents.subagents["qualification"].name,
+            "qualification_query",
+            "请委派资质核验子 Agent 核验本次采购候选供应商的资质与有效期。",
+            "qualification",
         )
-        _event(
-            deps,
-            task_id,
-            target,
-            "tool_result",
-            {
-                "tool": "supplier_qualification_query",
-                "summary": f"合格 {len(outcome.qualified)} 家，淘汰 {len(outcome.rejected)} 家",
-            },
-        )
+        outcome = task_context.results["qualification"]
         result = StageResult(
             state=TaskState.QUALIFYING,
             payload={"qualification": qualification_to_payload(outcome)},
@@ -230,35 +267,15 @@ def build_handlers(deps: CoordinatorDeps):
         return result
 
     def sourcing(task_id: str, context: dict[str, Any]) -> StageResult:
-        target = agents.subagents["sourcing"].name
-        _delegate(deps, task_id, target)
-        _load_skill(deps, task_id, target, "price_comparison")
-        _event(deps, task_id, target, "tool_call", {"tool": "quote_query"})
-        qualified = qualification_from_payload(context["qualification"])
-        outcome = _call_subagent(
-            deps,
+        task_context = run_delegated(
             task_id,
-            target,
-            lambda: run_sourcing(
-                deps.repo,
-                deps.config,
-                int(context["material_id"]),
-                int(context["quantity"]),
-                qualified,
-            ),
+            context,
+            agents.subagents["sourcing"].name,
+            "quote_query",
+            "请委派比价分析子 Agent 在合格供应商之间比价并给出推荐与理由。",
+            "sourcing",
         )
-        _event(
-            deps,
-            task_id,
-            target,
-            "tool_result",
-            {
-                "tool": "quote_query",
-                "summary": outcome.reason,
-                "comparisons": len(outcome.comparisons),
-                "detail": sourcing_to_payload(outcome),
-            },
-        )
+        outcome = task_context.results["sourcing"]
         result = StageResult(
             state=TaskState.SOURCING, payload={"sourcing": sourcing_to_payload(outcome)}
         )
@@ -274,39 +291,16 @@ def build_handlers(deps: CoordinatorDeps):
         return result
 
     def order_drafting(task_id: str, context: dict[str, Any]) -> StageResult:
-        target = agents.subagents["ordering"].name
-        _delegate(deps, task_id, target)
-        _load_skill(deps, task_id, target, "order_compliance")
-        _event(deps, task_id, target, "tool_call", {"tool": "order_draft"})
-        sourcing_outcome = sourcing_from_payload(context["sourcing"])
-        draft, decision = _call_subagent(
-            deps,
+        task_context = run_delegated(
             task_id,
-            target,
-            lambda: run_ordering(
-                deps.repo,
-                deps.policy,
-                sourcing_outcome,
-                int(context["material_id"]),
-                int(context["quantity"]),
-                str(context.get("cost_center") or "CC-1001"),
-                task_id,
-            ),
+            context,
+            agents.subagents["ordering"].name,
+            "order_draft",
+            "请委派订单执行子 Agent 生成订单草稿并判断是否需要人工审批。",
+            "draft",
         )
-        _event(
-            deps,
-            task_id,
-            target,
-            "tool_result",
-            {
-                "tool": "order_draft",
-                "summary": f"订单草稿 ¥{draft.total_amount:.2f}",
-                "requires_approval": decision.requires_approval,
-                "draft": draft_to_payload(draft),
-                "matched_rules": list(decision.matched_rules),
-                "recommendation_reason": sourcing_outcome.reason,
-            },
-        )
+        draft = task_context.results["draft"]
+        decision = task_context.results["decision"]
         result = StageResult(
             state=TaskState.ORDER_DRAFTING,
             payload={

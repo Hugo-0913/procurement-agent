@@ -36,12 +36,19 @@ def parse_response(quantity: int = 50) -> str:
     )
 
 
-def build_runner(tmp_path, responses: list[str], request_text: str = DEFAULT_REQUEST):
+def build_runner(
+    tmp_path,
+    responses: list[str],
+    request_text: str = DEFAULT_REQUEST,
+    delegate: bool = True,
+):
     engine = init_db(tmp_path / "erp.db")
     seed_demo_data(engine)
     repo = ErpRepository(engine, FaultRegistry(engine))
     store = TaskStore(engine)
     skills = SkillRegistry()
+    factory = FixedModelFactory(responses, agent_mode=True)
+    factory.model.delegate = delegate
     deps = CoordinatorDeps(
         repo=repo,
         store=store,
@@ -49,7 +56,7 @@ def build_runner(tmp_path, responses: list[str], request_text: str = DEFAULT_REQ
         agents_config=load_agents_config(),
         skills=skills,
         policy=PolicyEngine(CONFIG),
-        model_factory=FixedModelFactory(responses),
+        model_factory=factory,
     )
     graph = build_stage_graph(store, build_handlers(deps), CONFIG)
     runner = TaskRunner(store, graph)
@@ -155,6 +162,37 @@ def test_structured_request_saved(tmp_path):
     record = store.get_task(task_id)
     assert record.structured_request["material_name"] == "A4 纸"
     assert record.structured_request["quantity"] == 50
+
+
+def test_delegation_goes_through_framework(tmp_path):
+    """三个子 Agent 都必须通过框架的 task 工具被委派，而不是状态机直接调用。"""
+    _, store, _, runner = build_runner(tmp_path, [parse_response()])
+    task_id = runner.start(DEFAULT_REQUEST)
+
+    results = [
+        e for e in store.list_events(task_id) if e.event_type == "delegation_result"
+    ]
+    assert len(results) == 3
+    assert {e.payload["mode"] for e in results} == {"framework"}
+    assert {e.payload["to"] for e in results} == {
+        "qualification_agent",
+        "sourcing_agent",
+        "ordering_agent",
+    }
+
+
+def test_fallback_when_model_refuses_to_delegate(tmp_path):
+    """模型不调用 task 工具时降级为直接执行，并在事件里如实标注 fallback。"""
+    _, store, _, runner = build_runner(tmp_path, [parse_response()], delegate=False)
+    task_id = runner.start(DEFAULT_REQUEST)
+
+    assert store.get_task(task_id).state is TaskState.COMPLETED
+    results = [
+        e for e in store.list_events(task_id) if e.event_type == "delegation_result"
+    ]
+    assert len(results) == 3
+    assert {e.payload["mode"] for e in results} == {"fallback"}
+    assert all("reason" in e.payload for e in results)
 
 
 def test_invalid_json_from_model_marks_task_failed(tmp_path):
