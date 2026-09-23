@@ -84,6 +84,9 @@ def normalize_items(deps: CoordinatorDeps, parsed: dict[str, Any]) -> tuple[list
 PARSE_PROMPT = """你是采购需求解析器。请把下面的采购需求解析为 JSON。
 只输出 JSON，不要输出任何解释文字。
 
+需求中如果出现「补充说明」，那是用户对前面内容的**修正**：与前面冲突时一律以补充说明为准。
+例如原文写"苹果"、补充说明写"注射器"，物料名称必须取"注射器"。
+
 单种物料时输出：material_name（必填）、quantity（必填，整数）、unit、expected_date、
 budget、cost_center、note。缺失的可选字段填 null，禁止猜测未提及的信息。
 

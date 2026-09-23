@@ -203,7 +203,11 @@ class TaskRunner:
         record = self.store.get_task(task_id)
         if record.state is not TaskState.AWAITING_CLARIFICATION:
             raise InvalidTransition(record.state, TaskState.PARSING)
-        merged = f"{record.request_text}\n补充说明：{answer}"
+        # 补充说明是"修正"而不是"追加"：保留最新一条即可。
+        # 早期实现直接往末尾追加，用户改两次就会攒出多条互相矛盾的补充，
+        # 模型反而更抓不住重点（曾出现"补充了注射器仍解析成苹果"）。
+        base = record.request_text.split("\n补充说明：")[0].strip()
+        merged = f"{base}\n补充说明：{answer}"
         self.store.set_request_text(task_id, merged)
         self.store.append_event(
             task_id,

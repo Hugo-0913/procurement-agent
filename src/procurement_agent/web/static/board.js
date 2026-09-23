@@ -79,7 +79,7 @@ function addRow(materialId) {
   row.innerHTML = `
     <select class="row-material">${materialOptions(materialId)}</select>
     <input class="row-quantity" type="number" min="1" step="1" value="50">
-    <span class="unit"></span>
+    <span class="unit">-</span>
     <button class="row-remove" type="button">移除</button>`;
   container.appendChild(row);
 

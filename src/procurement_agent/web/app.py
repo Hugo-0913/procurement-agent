@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # 静态资源版本号：改动前端文件后必须更新它。
 # 浏览器会缓存 /static/*.js，若 HTML 与 JS 版本不匹配，页面按钮会"点了没反应"。
-ASSET_VERSION = "20260923-2"
+ASSET_VERSION = "20260923-3"
 
 
 def default_db_path() -> Path:
