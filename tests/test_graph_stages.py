@@ -83,6 +83,14 @@ def test_resume_after_process_restart(tmp_path):
     assert decided and decided[0].payload["operator"] == "alice"
     assert decided[0].payload["reason"] == "预算内"
 
+    # 审批留痕必须同时落到 approvals 表，而不只是事件流
+    records = store2.list_approvals(task_id)
+    assert len(records) == 1
+    assert records[0]["decision"] == "approve"
+    assert records[0]["operator"] == "alice"
+    assert records[0]["reason"] == "预算内"
+    assert records[0]["matched_rules"]
+
 
 def test_reject_routes_back_to_sourcing(tmp_path):
     db = tmp_path / "erp.db"
@@ -96,4 +104,3 @@ def test_reject_routes_back_to_sourcing(tmp_path):
     stages = [e.payload["to"] for e in store2.list_events(task_id) if e.event_type == "stage_change"]
     assert "REVISION_REQUIRED" in stages
     assert stages.count("SOURCING") == 2
-

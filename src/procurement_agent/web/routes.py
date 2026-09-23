@@ -287,6 +287,11 @@ def build_router(ctx: WebContext) -> APIRouter:
         ctx.runner.continue_after_clarification(task_id, payload.answer)
         return build_task_detail(ctx, task_id)
 
+    @router.get("/api/tasks/{task_id}/approvals")
+    def approvals(task_id: str) -> list[dict[str, Any]]:
+        ctx.store.get_task(task_id)  # 任务不存在时抛 404
+        return ctx.store.list_approvals(task_id)
+
     # ---------- 数据台 ----------
 
     @router.get("/api/suppliers")

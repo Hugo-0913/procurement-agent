@@ -138,6 +138,60 @@ class TaskStore:
                 {"now": _now(), "id": task_id},
             )
 
+    def record_approval(
+        self,
+        task_id: str,
+        decision: str,
+        operator: str,
+        reason: str = "",
+        matched_rules: list[str] | None = None,
+        order_id: int | None = None,
+    ) -> None:
+        """写入审批留痕。
+
+        审批记录既写事件流（供页面展示），也写 approvals 表（供审计查询）。
+        早期版本只写了事件流，导致这张表一直是空表。
+        """
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO approvals "
+                    "(task_id, order_id, decision, operator, reason, matched_rules, created_at) "
+                    "VALUES (:task_id, :order_id, :decision, :operator, :reason, :rules, :now)"
+                ),
+                {
+                    "task_id": task_id,
+                    "order_id": order_id,
+                    "decision": decision,
+                    "operator": operator,
+                    "reason": reason,
+                    "rules": json.dumps(matched_rules or [], ensure_ascii=False),
+                    "now": _now(),
+                },
+            )
+
+    def list_approvals(self, task_id: str | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM approvals"
+        params: dict[str, Any] = {}
+        if task_id is not None:
+            sql += " WHERE task_id = :task_id"
+            params["task_id"] = task_id
+        sql += " ORDER BY id"
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).all()
+        return [
+            {
+                "task_id": row.task_id,
+                "order_id": row.order_id,
+                "decision": row.decision,
+                "operator": row.operator,
+                "reason": row.reason,
+                "matched_rules": json.loads(row.matched_rules or "[]"),
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ]
+
     def add_tokens(self, task_id: str, tokens: int, total: int | None = None) -> None:
         with self.engine.begin() as conn:
             row = self._raw_task(conn, task_id)

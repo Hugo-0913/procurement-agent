@@ -231,3 +231,27 @@ async def test_clarification_rejected_when_not_needed(offline_app):
             f"/api/tasks/{task_id}/clarification", json={"answer": "50 箱"}
         )
         assert res.status_code == 409
+
+
+async def test_approval_is_recorded_and_queryable(big_order_app):
+    """审批留痕要能通过接口查到，而不是只躺在事件流里。"""
+    async with await make_client(big_order_app) as client:
+        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 A4 纸"})
+        task_id = created.json()["task_id"]
+        await wait_for_state(client, task_id, {"AWAITING_APPROVAL"})
+
+        empty = await client.get(f"/api/tasks/{task_id}/approvals")
+        assert empty.status_code == 200
+        assert empty.json() == []
+
+        await client.post(
+            f"/api/tasks/{task_id}/approval",
+            json={"decision": "approve", "operator": "王主管", "reason": "预算内"},
+        )
+        await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
+
+        records = (await client.get(f"/api/tasks/{task_id}/approvals")).json()
+        assert len(records) == 1
+        assert records[0]["operator"] == "王主管"
+        assert records[0]["decision"] == "approve"
+        assert any("阈值" in rule for rule in records[0]["matched_rules"])

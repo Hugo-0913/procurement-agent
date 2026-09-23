@@ -82,6 +82,13 @@ def build_stage_graph(
         )
         payload = decision if isinstance(decision, dict) else {"decision": str(decision)}
         store.record_intervention(task_id)
+        store.record_approval(
+            task_id=task_id,
+            decision=str(payload.get("decision", "")),
+            operator=str(payload.get("operator", "")),
+            reason=str(payload.get("reason", "")),
+            matched_rules=matched_rules,
+        )
         store.append_event(
             task_id,
             agent="human",
