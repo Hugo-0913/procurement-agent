@@ -127,25 +127,40 @@ def _emit(context: TaskContext, agent: str, kind: str, payload: dict[str, Any]) 
 
 
 def qualification_query() -> str:
-    """核验候选供应商资质，返回合格与淘汰清单的 JSON。"""
+    """逐物料核验供应商资质。
+
+    经营范围与产品注册证都是按物料判定的，所以多物料订单必须**每种物料单独核验**，
+    不能只拿第一个物料的 ID 跑一次。
+    """
     context = _ctx()
     _emit(context, QUALIFICATION_AGENT, "tool_call", {"tool": "supplier_qualification_query"})
     _load_skill(context, QUALIFICATION_AGENT, "supplier_qualification")
-    outcome = run_qualification(
-        context.repo, context.config, int(context.state["material_id"])
-    )
-    context.results["qualification"] = outcome
-    payload = qualification_to_payload(outcome)
+
+    by_material: dict[str, dict] = {}
+    outcomes: dict[int, Any] = {}
+    summaries: list[str] = []
+    for item in _items_of(context):
+        material_id = int(item["material_id"])
+        outcome = run_qualification(context.repo, context.config, material_id)
+        outcomes[material_id] = outcome
+        by_material[str(material_id)] = qualification_to_payload(outcome)
+        summaries.append(
+            f"{item.get('material_name') or material_id}：合格 {len(outcome.qualified)} 家，"
+            f"淘汰 {len(outcome.rejected)} 家"
+        )
+
+    context.results["qualifications"] = outcomes
+    context.results["qualification_payload"] = {"by_material": by_material}
     _emit(
         context,
         QUALIFICATION_AGENT,
         "tool_result",
         {
             "tool": "supplier_qualification_query",
-            "summary": f"合格 {len(outcome.qualified)} 家，淘汰 {len(outcome.rejected)} 家",
+            "summary": "；".join(summaries),
         },
     )
-    return json.dumps(payload, ensure_ascii=False)
+    return json.dumps({"by_material": by_material}, ensure_ascii=False)
 
 
 def quote_query() -> str:
@@ -154,9 +169,14 @@ def quote_query() -> str:
     _emit(context, SOURCING_AGENT, "tool_call", {"tool": "quote_query"})
     _load_skill(context, SOURCING_AGENT, "price_comparison")
 
-    qualified = context.results.get("qualification")
-    if qualified is None:
-        qualified = qualification_from_payload(context.state["qualification"])
+    qualifications = context.results.get("qualifications")
+    if qualifications is None:
+        qualifications = {
+            int(material_id): qualification_from_payload(data)
+            for material_id, data in (
+                (context.state.get("qualification") or {}).get("by_material", {})
+            ).items()
+        }
 
     items = _items_of(context)
     results = [
@@ -167,7 +187,8 @@ def quote_query() -> str:
                 context.config,
                 int(item["material_id"]),
                 int(item["quantity"]),
-                qualified,
+                qualifications.get(int(item["material_id"]))
+                or qualification_from_payload({"qualified": [], "rejected": [], "notes": []}),
                 expected_date=context.state.get("expected_date"),
             ),
         }

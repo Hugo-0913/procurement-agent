@@ -28,6 +28,8 @@ class OrderDraft:
     supplier_name: str = ""
     insufficient_quotes: bool = False
     deadline_infeasible: bool = False
+    moq_violated: bool = False
+    shelf_life_insufficient: bool = False
 
 
 def build_order_draft(
@@ -66,6 +68,8 @@ def build_order_draft(
         supplier_name=recommended.name,
         insufficient_quotes=bool(sourcing.insufficient_quotes),
         deadline_infeasible=not sourcing.deadline_feasible,
+        moq_violated=bool(sourcing.moq_violated),
+        shelf_life_insufficient=bool(sourcing.shelf_life_insufficient),
     )
 
 

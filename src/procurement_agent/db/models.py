@@ -34,6 +34,9 @@ class Material(Base):
     unit: Mapped[str] = mapped_column(String(16), default="件")
     category: Mapped[str | None] = mapped_column(String(64))
     aliases: Mapped[str | None] = mapped_column(Text)
+    # 效期管理：耗材有保质期，到货时剩余效期不得低于总效期的这个比例
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer)
+    min_remaining_ratio: Mapped[float] = mapped_column(Float, default=0.66)
 
 
 class Supplier(Base):
@@ -55,6 +58,10 @@ class Qualification(Base):
     qual_type: Mapped[str] = mapped_column(String(64), nullable=False)
     issued_at: Mapped[date] = mapped_column(Date, nullable=False)
     expires_at: Mapped[date] = mapped_column(Date, nullable=False)
+    # material_id 为空表示通用资质（营业执照、经营许可证）；不为空表示该物料的产品注册证
+    material_id: Mapped[int | None] = mapped_column(ForeignKey("materials.id"))
+    # 经营许可证的经营范围，用于校验所采购的物料类别是否被覆盖
+    scope: Mapped[str | None] = mapped_column(Text)
 
 
 class Quote(Base):
@@ -68,6 +75,8 @@ class Quote(Base):
     lead_days: Mapped[int] = mapped_column(Integer, nullable=False)
     valid_until: Mapped[date] = mapped_column(Date, nullable=False)
     available: Mapped[bool] = mapped_column(Boolean, default=True)
+    min_order_qty: Mapped[int] = mapped_column(Integer, default=1)
+    remaining_shelf_life_days: Mapped[int | None] = mapped_column(Integer)
 
 
 class PriceHistory(Base):
@@ -135,11 +144,29 @@ def _migrate(connection: sqlite3.Connection) -> None:
 
     演示项目用最小实现，避免引入 Alembic；生产环境应换成正式迁移工具。
     """
-    columns = {
-        row[1] for row in connection.execute("PRAGMA table_info(materials)").fetchall()
+    migrations = {
+        "materials": [
+            ("aliases", "TEXT"),
+            ("shelf_life_days", "INTEGER"),
+            ("min_remaining_ratio", "REAL NOT NULL DEFAULT 0.66"),
+        ],
+        "supplier_qualifications": [
+            ("material_id", "INTEGER"),
+            ("scope", "TEXT"),
+        ],
+        "quotes": [
+            ("min_order_qty", "INTEGER NOT NULL DEFAULT 1"),
+            ("remaining_shelf_life_days", "INTEGER"),
+        ],
     }
-    if "aliases" not in columns:
-        connection.execute("ALTER TABLE materials ADD COLUMN aliases TEXT")
+    for table, columns in migrations.items():
+        existing = {
+            row[1]
+            for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        for name, ddl in columns:
+            if name not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 from procurement_agent.db.seed import seed_demo_data  # noqa: E402

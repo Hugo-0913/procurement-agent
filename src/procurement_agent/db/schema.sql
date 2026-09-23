@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS materials (
     spec TEXT,
     unit TEXT NOT NULL DEFAULT '件',
     category TEXT,
-    aliases TEXT
+    aliases TEXT,
+    shelf_life_days INTEGER,
+    min_remaining_ratio REAL NOT NULL DEFAULT 0.66
 );
 
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -24,7 +26,9 @@ CREATE TABLE IF NOT EXISTS supplier_qualifications (
     supplier_id INTEGER NOT NULL REFERENCES suppliers (id) ON DELETE CASCADE,
     qual_type TEXT NOT NULL,
     issued_at DATE NOT NULL,
-    expires_at DATE NOT NULL
+    expires_at DATE NOT NULL,
+    material_id INTEGER REFERENCES materials (id),
+    scope TEXT
 );
 
 CREATE TABLE IF NOT EXISTS quotes (
@@ -35,7 +39,9 @@ CREATE TABLE IF NOT EXISTS quotes (
     freight REAL NOT NULL DEFAULT 0,
     lead_days INTEGER NOT NULL,
     valid_until DATE NOT NULL,
-    available INTEGER NOT NULL DEFAULT 1
+    available INTEGER NOT NULL DEFAULT 1,
+    min_order_qty INTEGER NOT NULL DEFAULT 1,
+    remaining_shelf_life_days INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS price_history (

@@ -14,6 +14,8 @@ class OrderDraftLike(Protocol):
     price_gap_ratio: float
     insufficient_quotes: bool
     deadline_infeasible: bool
+    moq_violated: bool
+    shelf_life_insufficient: bool
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,10 @@ class PolicyEngine:
             matched.append("可用报价不足，无法完成比价，需人工确认")
         if any(line.deadline_infeasible for line in lines):
             matched.append("交期无法满足期望到货日期，需人工确认")
+        if any(line.moq_violated for line in lines):
+            matched.append("采购量低于供应商起订量，需人工确认")
+        if any(line.shelf_life_insufficient for line in lines):
+            matched.append("到货批次剩余效期不足，需人工确认")
 
         if not matched:
             return PolicyDecision(allowed=True, requires_approval=False)

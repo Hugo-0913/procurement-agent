@@ -182,8 +182,8 @@ def test_order_persisted_with_recommended_supplier(tmp_path):
     assert len(orders) == 1
     order = orders[0]
     assert order.task_id == task_id
-    # 注射器的推荐供应商是瑞康医械供应链（单价 62.5 + 运费 120）
-    assert order.total_amount == pytest.approx(62.5 * 50 + 120)
+    # 50 箱未达瑞康（起订量 500）与济生（起订量 100）的门槛，因此选中华康（单价 68）
+    assert order.total_amount == pytest.approx(68.0 * 50)
     assert order.status == "CREATED"
 
 

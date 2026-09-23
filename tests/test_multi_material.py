@@ -30,7 +30,7 @@ MULTI_RESPONSE = """
 {
   "items": [
     {"material_name": "一次性无菌注射器", "quantity": 50, "unit": "箱"},
-    {"material_name": "医用外科口罩", "quantity": 20, "unit": "个"}
+    {"material_name": "医用外科口罩", "quantity": 200, "unit": "盒"}
   ],
   "cost_center": "CC-1001",
   "expected_date": null
@@ -110,7 +110,8 @@ def test_multi_item_task_creates_one_order_per_item(tmp_path):
         model_factory=FixedModelFactory([MULTI_RESPONSE], agent_mode=True),
     )
     runner = TaskRunner(store, build_stage_graph(store, build_handlers(deps), CONFIG))
-    task_id = runner.start("采购 50 箱 一次性无菌注射器和 20 盒医用外科口罩，成本中心 CC-1001")
+    # 数量需满足所选供应商的起订量，否则会（正确地）转入人工确认
+    task_id = runner.start("采购 50 箱 一次性无菌注射器和 200 盒医用外科口罩，成本中心 CC-1001")
 
     record = store.get_task(task_id)
     assert record.state is TaskState.COMPLETED

@@ -45,7 +45,9 @@ function renderApproval(detail, onDone) {
       <button id="btn-revise" class="ghost">要求修改</button>
       <span id="approval-hint" class="hint"></span>
     </div>`;
-  document.getElementById("timeline").prepend(card);
+  const host = document.getElementById("action-cards");
+  if (!host) return;
+  host.appendChild(card);
 
   const send = async (decision) => {
     const reason = document.getElementById("approval-reason").value.trim();

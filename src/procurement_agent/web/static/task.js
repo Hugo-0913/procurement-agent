@@ -155,7 +155,9 @@ function renderClarification(detail, onDone) {
       <button id="btn-clarify">提交补充信息</button>
       <span id="clarify-hint" class="hint"></span>
     </div>`;
-  document.getElementById("timeline").prepend(card);
+  const host = document.getElementById("action-cards");
+  if (!host) return;
+  host.appendChild(card);
 
   document.getElementById("btn-clarify").onclick = async () => {
     const answer = document.getElementById("clarify-answer").value.trim();

@@ -348,11 +348,11 @@ def build_handlers(deps: CoordinatorDeps):
             "请委派资质核验子 Agent 核验本次采购候选供应商的资质与有效期。",
             "qualification",
         )
-        outcome = task_context.results["qualification"]
+        qualification_payload = task_context.results["qualification_payload"]
         result = StageResult(
             state=TaskState.QUALIFYING,
             payload={
-                "qualification": qualification_to_payload(outcome),
+                "qualification": qualification_payload,
                 "loaded_skills": sorted(task_context.loaded_skills),
             },
         )
@@ -361,7 +361,10 @@ def build_handlers(deps: CoordinatorDeps):
                 deps,
                 task_id,
                 context,
-                {"step": "qualification", "qualified": len(outcome.qualified)},
+                {
+                    "step": "qualification",
+                    "materials": len(qualification_payload["by_material"]),
+                },
                 {"quantity": context.get("quantity"), "material": context.get("material_name")},
             )
         )
