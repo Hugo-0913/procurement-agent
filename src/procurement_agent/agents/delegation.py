@@ -39,7 +39,7 @@ QUALIFICATION_AGENT = "qualification_agent"
 SOURCING_AGENT = "sourcing_agent"
 ORDERING_AGENT = "ordering_agent"
 
-MAIN_SYSTEM_PROMPT = """你是企业耗材采购的主 Agent（采购协调者）。
+MAIN_SYSTEM_PROMPT = """你是企业医用耗材采购的主 Agent（采购协调者）。
 
 你必须通过 task 工具把工作委派给对应的子 Agent，自己不要代替子 Agent 完成核验、比价或下单：
 - qualification_agent：核验供应商资质

@@ -31,7 +31,7 @@ NO_QUOTE_SUPPLIER_CODES = {"SUP-C"}
 def _normalize_name(text: Any) -> str:
     """归一化物料名称：去掉所有空白（含全角空格）并转小写。
 
-    真实模型经常把"A4 纸"写成"A4纸"或"A4复印纸"，直接用 LIKE 匹配会失配，
+    真实模型经常把"一次性无菌注射器"写成"注射器"或"无菌注射器"，直接用 LIKE 匹配会失配，
     导致流程反复向用户澄清。这里做归一化 + 关键词包含匹配。
     """
     return re.sub(r"\s+", "", str(text or "")).lower()
@@ -40,8 +40,8 @@ def _normalize_name(text: Any) -> str:
 def _keywords(raw_name: Any) -> list[str]:
     """按空格与标点切分关键词，再各自归一化。
 
-    必须在去空格之前切分：先删空格会把"A4 纸"压成单个词"a4纸"，
-    导致"a4复印纸"这类别名匹配不上。
+    必须在去空格之前切分：先删空格会把"一次性无菌注射器"压成单个词"a4纸"，
+    导致"a4无菌注射器"这类别名匹配不上。
     """
     parts = re.split(r"[^0-9A-Za-z\u4e00-\u9fff]+", str(raw_name or "").lower())
     return [part for part in parts if part]
@@ -79,8 +79,8 @@ class ErpRepository:
                 candidates = [material.name, material.sku, *_alias_list(material.aliases)]
                 if any(_normalize_name(item) == target for item in candidates):
                     return material
-            # 关键词全覆盖：模型返回"A4复印纸"时，主数据的"A4"与"纸"都能命中；
-            # 别名同样参与匹配，例如用户说的"办公用纸"能对上"A4 纸"的别名
+            # 关键词全覆盖：模型返回"无菌注射器"时，主数据的"A4"与"纸"都能命中；
+            # 别名同样参与匹配，例如用户说的"无菌注射器"能对上"一次性无菌注射器"的别名
             best: Material | None = None
             best_score = 0
             for material in materials:
@@ -95,6 +95,15 @@ class ErpRepository:
     def get_material(self, material_id: int) -> Material | None:
         with Session(self.engine) as session:
             return session.get(Material, material_id)
+
+    def list_materials(self) -> list[Material]:
+        with Session(self.engine) as session:
+            return list(session.scalars(select(Material).order_by(Material.id)))
+
+    def default_material(self) -> Material | None:
+        """展示型接口的默认物料：取主数据第一条，避免把物料名写死在代码里。"""
+        materials = self.list_materials()
+        return materials[0] if materials else None
 
     def list_suppliers(self) -> list[Supplier]:
         with Session(self.engine) as session:

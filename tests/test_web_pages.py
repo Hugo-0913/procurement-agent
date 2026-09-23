@@ -43,9 +43,17 @@ async def test_data_page_renders(offline_app):
         res = await client.get("/data")
         assert res.status_code == 200
         html = res.text
-        assert "故障注入" in html
-        for label in ("让供应商 B 资质过期", "让供应商 C 停止报价", "让全部报价超预算"):
+        assert "模拟异常情况" in html
+        for label in (
+            "让瑞康医械供应链的经营许可证过期",
+            "让济生医疗科技停止报价",
+            "让全部报价涨到三倍",
+        ):
             assert label in html
+        # 数据台改成了业务视角的三个问题，不再是技术字段罗列
+        assert "供应商能不能用" in html
+        assert "谁家报价划算" in html
+        assert "买到的东西" in html
         assert (await client.get("/static/data.js")).status_code == 200
 
 
@@ -62,6 +70,5 @@ async def test_fault_panel_labels_come_from_api(offline_app):
     async with await make_client(offline_app) as client:
         flags = (await client.get("/api/faults")).json()["flags"]
         labels = {flag["label"] for flag in flags}
-        assert "让供应商 B 资质过期" in labels
-        assert "让全部报价超预算" in labels
-
+        assert "让瑞康医械供应链的经营许可证过期" in labels
+        assert "让全部报价涨到三倍" in labels

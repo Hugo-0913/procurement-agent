@@ -3,7 +3,7 @@ from tests.conftest import make_client, wait_for_state
 
 async def test_large_order_awaits_approval_with_rules(big_order_app):
     async with await make_client(big_order_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         detail = await wait_for_state(client, task_id, {"AWAITING_APPROVAL"})
 
@@ -21,7 +21,7 @@ async def test_large_order_awaits_approval_with_rules(big_order_app):
 
 async def test_approve_writes_order(big_order_app):
     async with await make_client(big_order_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"AWAITING_APPROVAL"})
 
@@ -39,7 +39,7 @@ async def test_approve_writes_order(big_order_app):
 
 async def test_reject_reruns_sourcing(big_order_app):
     async with await make_client(big_order_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"AWAITING_APPROVAL"})
 
@@ -69,7 +69,7 @@ async def test_reject_reruns_sourcing(big_order_app):
 
 async def test_approval_rejected_when_task_not_waiting(offline_app):
     async with await make_client(offline_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         res = await client.post(

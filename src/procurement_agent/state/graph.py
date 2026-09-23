@@ -24,6 +24,7 @@ class PipelineState(TypedDict, total=False):
     matched_rules: list[str]
     approval: dict[str, Any]
     outcome: dict[str, Any]
+    prefilled: dict[str, Any]
 
 
 def _saver_for(store: TaskStore) -> SqliteSaver:
@@ -166,12 +167,17 @@ class TaskRunner:
     def _config(self, task_id: str) -> dict[str, Any]:
         return {"configurable": {"thread_id": task_id}}
 
-    def start(self, request_text: str) -> str:
+    def start(self, request_text: str, prefilled: dict[str, Any] | None = None) -> str:
         task_id = self.store.create_task(request_text)
-        self.run(task_id, request_text)
+        self.run(task_id, request_text, prefilled)
         return task_id
 
-    def run(self, task_id: str, request_text: str) -> None:
+    def run(
+        self,
+        task_id: str,
+        request_text: str,
+        prefilled: dict[str, Any] | None = None,
+    ) -> None:
         """在已创建的任务上执行流程（供后台线程调用）。"""
         current = self.store.get_task(task_id).state
         if current is not TaskState.PARSING:
@@ -181,7 +187,9 @@ class TaskRunner:
                 {
                     "task_id": task_id,
                     "request_text": request_text,
-                    "context": {},
+                    # 点选式输入放在 context 里：阶段处理器读到的是 context 子字典，
+                    # 放在图状态顶层会导致下游读不到（曾经因此静默走回模型解析）。
+                    "context": {"prefilled": prefilled} if prefilled else {},
                     "needs_approval": False,
                     "matched_rules": [],
                 },

@@ -51,7 +51,7 @@ description: 当需要在多个合格供应商之间比较报价、计算综合�
     {"code": "SUP-A", "unit_price": 21.5, "freight": 0, "lead_days": 3, "total": 1075.0, "deviation": 0.014}
   ],
   "recommended_code": "SUP-A",
-  "reason": "推荐 晨光办公用品，综合成本 ¥1075.00；未选最低价 恒信纸业，原因：该供应商资质本月到期",
+  "reason": "推荐 华康医疗器械，综合成本 ¥1075.00；未选最低价 瑞康医械供应链，原因：该供应商资质本月到期",
   "insufficient_quotes": false
 }
 ```

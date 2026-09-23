@@ -11,7 +11,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import Field
 DEFAULT_PARSE_RESPONSE = json.dumps(
     {
-        "material_name": "A4 纸",
+        "material_name": "一次性无菌注射器",
         "quantity": 50,
         "unit": "箱",
         "expected_date": None,
@@ -152,7 +152,12 @@ UNIT_PATTERN = re.compile(r"(\d+)\s*(箱|包|件|个|套|卷|支|盒|本)")
 # 独立数字：排除"A4"这类字母数字混合标识中的数字，避免把物料型号当成数量
 NUMBER_PATTERN = re.compile(r"(?<![A-Za-z0-9])(\d+)(?![A-Za-z0-9])")
 COST_CENTER_PATTERN = re.compile(r"(CC-\d+)")
-MATERIAL_HINTS = (("A4", "A4 纸"), ("纸", "A4 纸"))
+# 离线规则解析器的物料识别提示：按顺序匹配，先具体后笼统。
+# 这是"关键词 → 主数据物料名"的映射，两侧必须同时改，别只改一边。
+MATERIAL_HINTS = (
+    ("注射器", "一次性无菌注射器"),
+    ("口罩", "医用外科口罩"),
+)
 
 
 def _flatten(messages: Any) -> str:

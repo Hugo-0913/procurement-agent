@@ -31,7 +31,7 @@ def test_supplier_b_qualification_becomes_expired(tmp_path):
 
 def test_supplier_c_quote_removed(tmp_path):
     repo, faults = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     before = len(repo.list_quotes(material.id))
     faults.set(SUPPLIER_C_NO_QUOTE, True)
     assert len(repo.list_quotes(material.id)) == before - 1
@@ -39,7 +39,7 @@ def test_supplier_c_quote_removed(tmp_path):
 
 def test_all_quotes_over_budget_triples_price(tmp_path):
     repo, faults = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     before = {q.supplier_id: q.unit_price for q in repo.list_quotes(material.id)}
     faults.set(ALL_QUOTES_OVER_BUDGET, True)
     after = {q.supplier_id: q.unit_price for q in repo.list_quotes(material.id)}

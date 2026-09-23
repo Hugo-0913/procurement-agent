@@ -1,8 +1,8 @@
-# 耗材采购自动化 Agent 系统 实施计划
+# 医用耗材采购自动化 Agent 系统 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 构建一个可演示、可评测的耗材采购自动化 Agent 系统，用主 Agent 委派三类子 Agent 完成「需求输入 → 资质核验 → 比价分析 → 订单生成」闭环，并提供本地 Web 界面实时观察委派过程、审批拦截与异常重试。
+**Goal:** 构建一个可演示、可评测的医用耗材采购自动化 Agent 系统，用主 Agent 委派三类子 Agent 完成「需求输入 → 资质核验 → 比价分析 → 订单生成」闭环，并提供本地 Web 界面实时观察委派过程、审批拦截与异常重试。
 
 **Architecture:** 外层用 LangGraph 状态机 + SQLite checkpointer 作为唯一任务状态源，负责阶段流转与人工审批的持久化中断；内层用 DeepAgents 作为 Agent 运行时，承载主 Agent 与三个子 Agent 的委派、虚拟文件系统与中间件；DeepSeek 作为唯一模型；FastAPI + 原生 JS 提供 Web 界面，通过 SSE 推送事件。
 
@@ -339,14 +339,14 @@ def make_repo(tmp_path: Path) -> ErpRepository:
 
 def test_find_material_by_name(tmp_path):
     repo = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     assert material is not None
-    assert material.sku == "ST-A4-500"
+    assert material.sku == "ST-SYR-5ML"
 
 
 def test_quotes_available_for_material(tmp_path):
     repo = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     quotes = repo.list_quotes(material.id)
     assert len(quotes) >= 3
     assert all(q.unit_price > 0 for q in quotes)
@@ -380,7 +380,7 @@ Expected: FAIL，模块不存在
 
 `models.py` 用 SQLAlchemy 2.0 `Mapped` / `mapped_column` 定义模型；`init_db` 先执行 `PRAGMA foreign_keys=ON` 再 `create_all`。
 
-`seed.py` 写入演示数据：物料 `A4 纸`（SKU `ST-A4-500`，规格 `70g/500张`，单位 `箱`）；4 家供应商（`SUP-A` A 类、`SUP-B` B 类、`SUP-C` A 类且资质 20 天后到期、`SUP-D` 黑名单）；询价覆盖 `SUP-A/B/C`，单价分别 21.5 / 19.8 / 23.0，运费 0 / 120 / 0，交期 3 / 5 / 2 天；每家 3 条历史成交价；7 条历史采购需求写入 `purchase_requests`。
+`seed.py` 写入演示数据：物料 `一次性无菌注射器`（SKU `ST-SYR-5ML`，规格 `70g/500张`，单位 `箱`）；4 家供应商（`SUP-A` A 类、`SUP-B` B 类、`SUP-C` A 类且资质 20 天后到期、`SUP-D` 黑名单）；询价覆盖 `SUP-A/B/C`，单价分别 21.5 / 19.8 / 23.0，运费 0 / 120 / 0，交期 3 / 5 / 2 天；每家 3 条历史成交价；7 条历史采购需求写入 `purchase_requests`。
 
 - [ ] **Step 5: 实现 Repository**
 
@@ -445,7 +445,7 @@ def test_supplier_b_qualification_becomes_expired(tmp_path):
 
 def test_supplier_c_quote_removed(tmp_path):
     repo, faults = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     before = len(repo.list_quotes(material.id))
     faults.set("supplier_c_no_quote", True)
     assert len(repo.list_quotes(material.id)) == before - 1
@@ -525,7 +525,7 @@ def make_store(tmp_path: Path) -> TaskStore:
 
 def test_create_task_starts_pending(tmp_path):
     store = make_store(tmp_path)
-    task_id = store.create_task("采购 50 箱 A4 纸")
+    task_id = store.create_task("采购 50 箱 一次性无菌注射器")
     assert store.get_task(task_id).state is TaskState.PENDING
 
 
@@ -643,14 +643,14 @@ def make_handlers(total_amount: float, needs_approval: bool):
 def test_happy_path_completes(tmp_path: Path):
     store = TaskStore(init_db(tmp_path / "erp.db"))
     runner = TaskRunner(store, build_stage_graph(store, make_handlers(1000.0, False), CONFIG))
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
     assert store.get_task(task_id).state is TaskState.COMPLETED
 
 
 def test_approval_pauses_task(tmp_path: Path):
     store = TaskStore(init_db(tmp_path / "erp.db"))
     runner = TaskRunner(store, build_stage_graph(store, make_handlers(62000.0, True), CONFIG))
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
     assert store.get_task(task_id).state is TaskState.AWAITING_APPROVAL
 
 
@@ -658,7 +658,7 @@ def test_resume_after_process_restart(tmp_path: Path):
     db = tmp_path / "erp.db"
     store = TaskStore(init_db(db))
     runner = TaskRunner(store, build_stage_graph(store, make_handlers(62000.0, True), CONFIG))
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
 
     store2 = TaskStore(init_db(db))
     runner2 = TaskRunner(store2, build_stage_graph(store2, make_handlers(62000.0, True), CONFIG))
@@ -869,7 +869,7 @@ def make_env(tmp_path: Path):
     faults = FaultRegistry(engine)
     repo = ErpRepository(engine, faults)
     cfg = ProcurementConfig(50000.0, 3, 12000, 2, 30)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     return repo, faults, cfg, material
 
 
@@ -1538,7 +1538,7 @@ Expected: FAIL，返回 404
 
 `base.html` 定义顶部导航（任务看板 `/`、数据台 `/data`、评测 `/eval`）与公共样式引用，提供 `{% block content %}`。
 
-`board.html` 结构：筛选标签行 → 新建需求区（`<textarea id="request-text">` + 提交按钮 + "填入示例需求"按钮，示例文本为 `采购 50 箱 A4 纸，下周一前到货，成本中心 CC-1001`）→ 任务卡片列表容器。
+`board.html` 结构：筛选标签行 → 新建需求区（`<textarea id="request-text">` + 提交按钮 + "填入示例需求"按钮，示例文本为 `采购 50 箱 一次性无菌注射器，下周一前到货，成本中心 CC-1001`）→ 任务卡片列表容器。
 
 `board.js` 逻辑：加载时 `GET /api/tasks` 渲染卡片；点提交 `POST /api/tasks` 成功后 `location.href = "/tasks/" + taskId`；点筛选标签按状态过滤本地列表；点卡片跳转执行页。
 

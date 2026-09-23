@@ -26,7 +26,7 @@ description: 当收到采购需求文本、需要把它拆解为物料、数量�
 1. 只提取用户明确表达的信息，禁止补全未提及的字段。
 2. `material_name` 与 `quantity` 缺任意一项时，不得继续推进流程，必须向用户提出澄清问题。
 3. 相对时间表达按当前日期换算：本周、下周、明天等需转换为具体日期。
-4. 数量与单位分离解析，例如"50 箱 A4 纸"解析为 `quantity=50`、`unit=箱`、`material_name=A4 纸`。
+4. 数量与单位分离解析，例如"50 箱 一次性无菌注射器"解析为 `quantity=50`、`unit=箱`、`material_name=一次性无菌注射器`。
 5. 预算出现"不超过""控制在"等表述时按上限处理。
 
 ## 输出格式
@@ -35,7 +35,7 @@ description: 当收到采购需求文本、需要把它拆解为物料、数量�
 
 ```json
 {
-  "material_name": "A4 纸",
+  "material_name": "一次性无菌注射器",
   "quantity": 50,
   "unit": "箱",
   "expected_date": "2026-09-21",
@@ -51,8 +51,8 @@ description: 当收到采购需求文本、需要把它拆解为物料、数量�
 ```json
 {
   "items": [
-    {"material_name": "A4 纸", "quantity": 50, "unit": "箱"},
-    {"material_name": "订书机", "quantity": 20, "unit": "个"}
+    {"material_name": "一次性无菌注射器", "quantity": 50, "unit": "箱"},
+    {"material_name": "医用外科口罩", "quantity": 20, "unit": "个"}
   ],
   "expected_date": "2026-09-21",
   "budget": null,

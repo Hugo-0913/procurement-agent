@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.erp.faults import ALL_FLAGS, FLAG_LABELS, FaultRegistry
@@ -36,14 +36,33 @@ class WebContext:
 
 
 class CreateTaskRequest(BaseModel):
-    request_text: str
+    """两种下单方式：点选式（items）或自然语言（request_text）。"""
 
-    @field_validator("request_text")
-    @classmethod
-    def not_blank(cls, value: str) -> str:
-        if not value or not value.strip():
-            raise ValueError("采购需求不能为空")
-        return value.strip()
+    request_text: str | None = None
+    items: list[dict[str, Any]] | None = None
+    cost_center: str | None = None
+    expected_date: str | None = None
+
+    @model_validator(mode="after")
+    def check_input(self) -> "CreateTaskRequest":
+        has_items = bool(self.items)
+        has_text = bool(self.request_text and self.request_text.strip())
+        if not has_items and not has_text:
+            raise ValueError("请选择要采购的物料，或填写采购需求")
+        if self.request_text:
+            self.request_text = self.request_text.strip()
+        if has_items:
+            for item in self.items or []:
+                if not item.get("material_id"):
+                    raise ValueError("每一行都要选择物料")
+                try:
+                    quantity = int(item.get("quantity") or 0)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("数量必须是整数") from exc
+                if quantity <= 0:
+                    raise ValueError("数量必须大于 0")
+                item["quantity"] = quantity
+        return self
 
 
 class ApprovalRequest(BaseModel):
@@ -86,6 +105,37 @@ class ClarificationRequest(BaseModel):
 def _event_payload(store: TaskStore, task_id: str, event_type: str) -> dict[str, Any] | None:
     events = [e for e in store.list_events(task_id) if e.event_type == event_type]
     return events[-1].payload if events else None
+
+
+def _from_selection(
+    ctx: WebContext, payload: CreateTaskRequest
+) -> tuple[dict[str, Any], str]:
+    """把点选式下单转成流程可用的结构化输入，并拼一句人能读懂的需求描述。
+
+    用户点选的是物料 ID 与数量，这里查主数据补全名称与单位，既用于展示，也用于日志追溯。
+    """
+    items: list[dict[str, Any]] = []
+    parts: list[str] = []
+    for row in payload.items or []:
+        material = ctx.repo.get_material(int(row["material_id"]))
+        if material is None:
+            raise HTTPException(status_code=422, detail="所选物料不在采购目录中")
+        quantity = int(row["quantity"])
+        unit = row.get("unit") or material.unit
+        items.append({"material_id": material.id, "quantity": quantity})
+        parts.append(f"{quantity} {unit}{material.name}")
+
+    text = "采购 " + "、".join(parts)
+    if payload.cost_center:
+        text += f"，成本中心 {payload.cost_center}"
+    return (
+        {
+            "items": items,
+            "cost_center": payload.cost_center,
+            "expected_date": payload.expected_date,
+        },
+        text,
+    )
 
 
 def build_task_detail(ctx: WebContext, task_id: str) -> dict[str, Any]:
@@ -223,10 +273,15 @@ def build_router(ctx: WebContext) -> APIRouter:
 
     @router.post("/api/tasks")
     def create_task(payload: CreateTaskRequest) -> dict[str, str]:
-        task_id = ctx.store.create_task(payload.request_text)
+        if payload.items:
+            prefilled, request_text = _from_selection(ctx, payload)
+        else:
+            prefilled = {}
+            request_text = payload.request_text or ""
+        task_id = ctx.store.create_task(request_text)
 
         def run() -> None:
-            ctx.runner.run(task_id, payload.request_text)
+            ctx.runner.run(task_id, request_text, prefilled or None)
 
         threading.Thread(target=run, name=f"task-{task_id}", daemon=True).start()
         return {"task_id": task_id}
@@ -316,34 +371,63 @@ def build_router(ctx: WebContext) -> APIRouter:
             )
         return rows
 
-    @router.get("/api/quotes")
-    def quotes(material_id: int | None = None) -> list[dict[str, Any]]:
-        material = (
-            ctx.repo.get_material(material_id)
-            if material_id is not None
-            else ctx.repo.find_material_by_name("A4 纸")
-        )
-        if material is None:
-            return []
-        suppliers = {s.id: s for s in ctx.repo.list_suppliers()}
+    @router.get("/api/materials")
+    def materials() -> list[dict[str, Any]]:
+        """主数据里的可采购物料，供点选式下单表单使用。"""
         return [
             {
-                "supplier_code": suppliers[quote.supplier_id].code,
-                "supplier_name": suppliers[quote.supplier_id].name,
-                "material": material.name,
-                "unit_price": quote.unit_price,
-                "freight": quote.freight,
-                "lead_days": quote.lead_days,
-                "valid_until": quote.valid_until.isoformat(),
+                "id": material.id,
+                "sku": material.sku,
+                "name": material.name,
+                "spec": material.spec,
+                "unit": material.unit,
+                "category": material.category,
             }
-            for quote in ctx.repo.list_quotes(material.id)
-            if quote.supplier_id in suppliers
+            for material in ctx.repo.list_materials()
         ]
+
+    @router.get("/api/cost-centers")
+    def cost_centers() -> list[dict[str, str]]:
+        """可选成本中心。演示数据固定，真实系统中来自 ERP 主数据。"""
+        return [
+            {"code": "CC-1001", "name": "行政后勤"},
+            {"code": "CC-2003", "name": "门诊部"},
+            {"code": "CC-3007", "name": "手术室"},
+            {"code": "CC-1002", "name": "护理部"},
+        ]
+
+    @router.get("/api/quotes")
+    def quotes(material_id: int | None = None) -> list[dict[str, Any]]:
+        """报价查询。不传 material_id 时返回全部物料，便于横向比价。"""
+        if material_id is not None:
+            target = ctx.repo.get_material(material_id)
+            materials = [target] if target else []
+        else:
+            materials = ctx.repo.list_materials()
+        suppliers = {s.id: s for s in ctx.repo.list_suppliers()}
+        rows: list[dict[str, Any]] = []
+        for material in materials:
+            for quote in ctx.repo.list_quotes(material.id):
+                if quote.supplier_id not in suppliers:
+                    continue
+                rows.append(
+                    {
+                        "material_id": material.id,
+                        "material_name": material.name,
+                        "unit": material.unit,
+                        "supplier_code": suppliers[quote.supplier_id].code,
+                        "supplier_name": suppliers[quote.supplier_id].name,
+                        "unit_price": quote.unit_price,
+                        "freight": quote.freight,
+                        "lead_days": quote.lead_days,
+                    }
+                )
+        return rows
 
     @router.get("/api/orders")
     def orders() -> list[dict[str, Any]]:
         suppliers = {s.id: s for s in ctx.repo.list_suppliers()}
-        materials = {m.id: m for m in [ctx.repo.find_material_by_name("A4 纸")] if m}
+        materials = {m.id: m for m in [ctx.repo.find_material_by_name("一次性无菌注射器")] if m}
         return [
             {
                 "id": order.id,

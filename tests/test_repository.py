@@ -12,9 +12,9 @@ def make_repo(tmp_path: Path) -> ErpRepository:
 
 def test_find_material_by_name(tmp_path):
     repo = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     assert material is not None
-    assert material.sku == "ST-A4-500"
+    assert material.sku == "ST-SYR-5ML"
 
 
 def test_seed_is_idempotent(tmp_path):
@@ -25,27 +25,31 @@ def test_seed_is_idempotent(tmp_path):
     assert len(repo.list_suppliers()) == 4
 
 
-def test_existing_db_gets_aliases_backfilled(tmp_path):
-    """老库里的物料没有别名字段时，重跑种子应补齐，而不是被幂等逻辑跳过。"""
+def test_existing_db_gets_licence_backfilled(tmp_path):
+    """老库缺少医疗器械经营许可证时，重跑种子应补齐，而不是被幂等逻辑跳过。"""
     import sqlite3
 
     db = tmp_path / "erp.db"
     engine = init_db(db)
     seed_demo_data(engine)
-    # 模拟"早期建的库"：把别名清空
+    # 模拟"早期建的库"：只保留营业执照，删掉经营许可证
     con = sqlite3.connect(db)
-    con.execute("UPDATE materials SET aliases = NULL")
+    con.execute(
+        "DELETE FROM supplier_qualifications WHERE qual_type = '医疗器械经营许可证'"
+    )
     con.commit()
     con.close()
 
     seed_demo_data(engine)  # 幂等路径，应触发回填
     repo = ErpRepository(engine)
-    assert repo.find_material_by_name("办公用纸") is not None
+    for supplier in repo.list_suppliers():
+        types = {q.qual_type for q in repo.list_qualifications(supplier.id)}
+        assert "医疗器械经营许可证" in types, f"{supplier.code} 未补齐经营许可证"
 
 
 def test_quotes_available_for_material(tmp_path):
     repo = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     quotes = repo.list_quotes(material.id)
     assert len(quotes) >= 3
     assert all(q.unit_price > 0 for q in quotes)
@@ -53,17 +57,17 @@ def test_quotes_available_for_material(tmp_path):
 
 def test_price_history_available(tmp_path):
     repo = make_repo(tmp_path)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     supplier = repo.supplier_by_code("SUP-A")
     history = repo.price_history(material.id, supplier.id)
     assert len(history) == 3
-    assert 21.0 <= sum(history) / len(history) <= 22.0
+    assert 67.0 <= sum(history) / len(history) <= 69.0
 
 
 def test_create_and_read_order(tmp_path):
     repo = make_repo(tmp_path)
     supplier = repo.supplier_by_code("SUP-A")
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     order_id = repo.create_order(
         {
             "task_id": "t-1",
@@ -97,5 +101,9 @@ def test_qualification_expiry_relative_to_today(tmp_path):
     sup_c = repo.supplier_by_code("SUP-C")
     quals = repo.list_qualifications(sup_c.id)
     assert quals
-    delta = (quals[0].expires_at - date.today()).days
+    # 每家都有营业执照与医疗器械经营许可证，临期演示看的是许可证
+    licence = next(q for q in quals if q.qual_type == "医疗器械经营许可证")
+    delta = (licence.expires_at - date.today()).days
     assert 0 < delta <= 30
+    business = next(q for q in quals if q.qual_type == "营业执照")
+    assert (business.expires_at - date.today()).days > 365

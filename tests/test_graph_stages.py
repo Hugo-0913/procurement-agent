@@ -44,7 +44,7 @@ def make_runner(db: Path, total: float, needs_approval: bool):
 
 def test_happy_path_completes(tmp_path):
     store, runner = make_runner(tmp_path / "erp.db", 1000.0, False)
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
     record = store.get_task(task_id)
     assert record.state is TaskState.COMPLETED
     assert record.finished_at is not None
@@ -61,7 +61,7 @@ def test_happy_path_completes(tmp_path):
 
 def test_approval_pauses_task(tmp_path):
     store, runner = make_runner(tmp_path / "erp.db", 62000.0, True)
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
     assert store.get_task(task_id).state is TaskState.AWAITING_APPROVAL
     events = store.list_events(task_id)
     assert any(e.event_type == "approval_requested" for e in events)
@@ -71,7 +71,7 @@ def test_approval_pauses_task(tmp_path):
 def test_resume_after_process_restart(tmp_path):
     db = tmp_path / "erp.db"
     store, runner = make_runner(db, 62000.0, True)
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
     assert store.get_task(task_id).state is TaskState.AWAITING_APPROVAL
 
     store2, runner2 = make_runner(db, 62000.0, True)
@@ -95,7 +95,7 @@ def test_resume_after_process_restart(tmp_path):
 def test_reject_routes_back_to_sourcing(tmp_path):
     db = tmp_path / "erp.db"
     store, runner = make_runner(db, 62000.0, True)
-    task_id = runner.start("采购 50 箱 A4 纸")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器")
 
     store2, runner2 = make_runner(db, 1000.0, False)
     runner2.resume(task_id, decision="reject", operator="bob", reason="价格不合理")

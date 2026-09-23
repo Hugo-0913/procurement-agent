@@ -6,7 +6,7 @@ from procurement_agent.state.store import TaskStore
 
 def make_guard(tmp_path):
     store = TaskStore(init_db(tmp_path / "erp.db"))
-    task_id = store.create_task("采购 50 箱 A4 纸")
+    task_id = store.create_task("采购 50 箱 一次性无菌注射器")
     return PolicyGuard(store), store, task_id
 
 

@@ -18,13 +18,13 @@ from procurement_agent.state.store import TaskStore
 from tests.fakes import FixedModelFactory
 
 CONFIG = ProcurementConfig(50000.0, 3, 12000, 2, 30)
-DEFAULT_REQUEST = "采购 50 箱 A4 纸，下周一前到货，成本中心 CC-1001"
+DEFAULT_REQUEST = "采购 50 箱 一次性无菌注射器，下周一前到货，成本中心 CC-1001"
 
 
 def parse_response(quantity: int = 50) -> str:
     return json.dumps(
         {
-            "material_name": "A4 纸",
+            "material_name": "一次性无菌注射器",
             "quantity": quantity,
             "unit": "箱",
             "expected_date": None,
@@ -110,7 +110,7 @@ def test_skills_loaded_progressively_in_stage_order(tmp_path):
 
 def test_clarification_task_never_loads_later_skills(tmp_path):
     _, store, skills, runner = build_runner(tmp_path, [parse_response(quantity=0)])
-    task_id = runner.start("帮我再采购一些纸")
+    task_id = runner.start("帮我再采购一些注射器")
 
     record = store.get_task(task_id)
     assert record.state is TaskState.AWAITING_CLARIFICATION
@@ -130,7 +130,7 @@ def test_clarification_answer_continues_the_task(tmp_path):
     _, store, _, runner = build_runner(
         tmp_path, [parse_response(quantity=0), parse_response(quantity=50)]
     )
-    task_id = runner.start("帮我再采购一些纸")
+    task_id = runner.start("帮我再采购一些注射器")
     assert store.get_task(task_id).state is TaskState.AWAITING_CLARIFICATION
 
     runner.continue_after_clarification(task_id, "50 箱")
@@ -154,7 +154,7 @@ def test_clarification_cannot_be_answered_for_other_states(tmp_path):
 
 def test_large_order_requests_approval(tmp_path):
     _, store, _, runner = build_runner(tmp_path, [parse_response(quantity=3000)])
-    task_id = runner.start("采购 3000 箱 A4 纸")
+    task_id = runner.start("采购 3000 箱 一次性无菌注射器")
 
     record = store.get_task(task_id)
     assert record.state is TaskState.AWAITING_APPROVAL
@@ -182,7 +182,8 @@ def test_order_persisted_with_recommended_supplier(tmp_path):
     assert len(orders) == 1
     order = orders[0]
     assert order.task_id == task_id
-    assert order.total_amount == pytest.approx(21.5 * 50)
+    # 注射器的推荐供应商是瑞康医械供应链（单价 62.5 + 运费 120）
+    assert order.total_amount == pytest.approx(62.5 * 50 + 120)
     assert order.status == "CREATED"
 
 
@@ -191,7 +192,7 @@ def test_structured_request_saved(tmp_path):
     task_id = runner.start(DEFAULT_REQUEST)
 
     record = store.get_task(task_id)
-    assert record.structured_request["material_name"] == "A4 纸"
+    assert record.structured_request["material_name"] == "一次性无菌注射器"
     assert record.structured_request["quantity"] == 50
 
 

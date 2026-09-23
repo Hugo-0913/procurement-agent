@@ -1,4 +1,4 @@
-/* 耗材采购自动化 Agent · 样式表
+/* 医用耗材采购自动化 Agent · 样式表
    设计取向：浅色底 + 卡片化分区 + 语义化状态色；信息密度优先，不做装饰性元素。 */
 
 :root {
@@ -189,6 +189,26 @@ button.chip.active { background: var(--blue); border-color: var(--blue); color: 
 
 .hero-text { margin-bottom: 12px; }
 .hero-text p { margin: 4px 0 0; }
+
+/* 下单入口切换与表单 */
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+
+.field { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.field input, .field select { min-width: 150px; }
+
+.form-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.form-table th {
+  text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-3);
+  padding: 0 8px 6px 0; border-bottom: 1px solid var(--line);
+}
+.form-table td { padding: 8px 8px 8px 0; vertical-align: middle; }
+.form-table select, .form-table input { width: 100%; }
+.form-table .unit { color: var(--ink-3); font-size: 12.5px; }
+.form-table .row-remove {
+  background: #fff; color: var(--red); border-color: var(--line);
+  padding: 7px 10px; font-size: 12px;
+}
+.form-table .row-remove:hover { background: var(--red-weak); border-color: var(--red); }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 

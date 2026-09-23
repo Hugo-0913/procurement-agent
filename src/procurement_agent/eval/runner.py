@@ -87,7 +87,7 @@ def load_cases(path: Path | None = None) -> list[EvalCase]:
 def _parse_response(quantity: int) -> str:
     return json.dumps(
         {
-            "material_name": "A4 纸",
+            "material_name": "一次性无菌注射器",
             "quantity": quantity,
             "unit": "箱",
             "expected_date": None,
@@ -129,7 +129,7 @@ def measure_context_reduction(
         for index in range(tool_results)
     ]
     essential = {
-        "material_name": "A4 纸",
+        "material_name": "一次性无菌注射器",
         "quantity": 50,
         "cost_center": "CC-1001",
         "stage_conclusions": ["资质核验完成", "比价完成"],

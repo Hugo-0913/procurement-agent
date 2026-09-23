@@ -34,11 +34,11 @@ def test_offline_model_returns_aimessage():
     from procurement_agent.agents.offline import OfflineModel, parse_request_text
 
     model = OfflineModel(default_response=None)
-    result = model.invoke([{"role": "user", "content": "采购需求：采购 50 箱 A4 纸"}])
+    result = model.invoke([{"role": "user", "content": "采购需求：采购 50 箱 一次性无菌注射器"}])
     assert isinstance(result, AIMessage)
     import json
 
-    assert json.loads(response_text(result)) == parse_request_text("采购 50 箱 A4 纸")
+    assert json.loads(response_text(result)) == parse_request_text("采购 50 箱 一次性无菌注射器")
 
 
 def test_fake_model_returns_aimessage():

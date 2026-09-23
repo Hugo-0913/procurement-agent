@@ -19,7 +19,7 @@ def test_comparison_covers_all_qualified_quotes(env):
     outcome = prepare(env)
     assert {c.code for c in outcome.comparisons} == {"SUP-A", "SUP-B", "SUP-C"}
     sup_a = next(c for c in outcome.comparisons if c.code == "SUP-A")
-    assert sup_a.total == pytest.approx(21.5 * QUANTITY)
+    assert sup_a.total == pytest.approx(68.0 * QUANTITY)
     assert sup_a.history_avg is not None
     assert sup_a.deviation is not None
 

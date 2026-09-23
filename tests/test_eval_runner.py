@@ -32,7 +32,7 @@ def small_cases(path: Path) -> list[EvalCase]:
     data = [
         {
             "id": "S-1",
-            "request_text": "采购 50 箱 A4 纸",
+            "request_text": "采购 50 箱 一次性无菌注射器",
             "quantity": 50,
             "faults": {},
             "expect_state": "COMPLETED",
@@ -40,7 +40,7 @@ def small_cases(path: Path) -> list[EvalCase]:
         },
         {
             "id": "S-2",
-            "request_text": "采购 3000 箱 A4 纸",
+            "request_text": "采购 3000 箱 一次性无菌注射器",
             "quantity": 3000,
             "faults": {"all_quotes_over_budget": True},
             "expect_state": "AWAITING_APPROVAL",
@@ -48,7 +48,7 @@ def small_cases(path: Path) -> list[EvalCase]:
         },
         {
             "id": "S-3",
-            "request_text": "采购 50 箱 A4 纸（B 资质异常）",
+            "request_text": "采购 50 箱 一次性无菌注射器（B 资质异常）",
             "quantity": 50,
             "faults": {"supplier_b_expired": True},
             "expect_state": "COMPLETED",
@@ -83,7 +83,7 @@ def test_failures_carry_task_ids(tmp_path):
     data = [
         {
             "id": "X-1",
-            "request_text": "采购 50 箱 A4 纸",
+            "request_text": "采购 50 箱 一次性无菌注射器",
             "quantity": 50,
             "faults": {},
             "expect_state": "FAILED",

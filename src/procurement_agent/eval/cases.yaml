@@ -1,182 +1,182 @@
 - id: N-01
-  request_text: 采购 50 箱 A4 纸，成本中心 CC-1001
+  request_text: 采购 50 箱 一次性无菌注射器，成本中心 CC-1001
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-02
-  request_text: 采购 50 箱 A4 纸，下周一前到货
+  request_text: 采购 50 箱 一次性无菌注射器，下周一前到货
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-03
-  request_text: 行政部需 50 箱 A4 纸
+  request_text: 行政部需 50 箱 一次性无菌注射器
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-04
-  request_text: 采购 50 箱 A4 纸，预算 1200 元
+  request_text: 采购 50 箱 一次性无菌注射器，预算 1200 元
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-05
-  request_text: 研发中心领用 50 箱 A4 纸
+  request_text: 研发中心领用 50 箱 一次性无菌注射器
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-06
-  request_text: 采购 50 箱 A4 纸，成本中心 CC-2003
+  request_text: 采购 50 箱 一次性无菌注射器，成本中心 CC-2003
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-07
-  request_text: 采购 50 箱 A4 纸，优先 A 类供应商
+  request_text: 采购 50 箱 一次性无菌注射器，优先 A 类供应商
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-08
-  request_text: 采购 50 箱 A4 纸，本周内到货
+  request_text: 采购 50 箱 一次性无菌注射器，本周内到货
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-09
-  request_text: 采购 50 箱 A4 纸，成本中心 CC-1002
+  request_text: 采购 50 箱 一次性无菌注射器，成本中心 CC-1002
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-10
-  request_text: 采购 50 箱 A4 纸，常规补货
+  request_text: 采购 50 箱 一次性无菌注射器，常规补货
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-11
-  request_text: 采购 50 箱 A4 纸，走标准流程
+  request_text: 采购 50 箱 一次性无菌注射器，走标准流程
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: N-12
-  request_text: 采购 50 箱 A4 纸，无需加急
+  request_text: 采购 50 箱 一次性无菌注射器，无需加急
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: F-B-01
-  request_text: 采购 50 箱 A4 纸（供应商 B 资质异常）
+  request_text: 采购 50 箱 一次性无菌注射器（供应商 B 资质异常）
   quantity: 50
   faults:
     supplier_b_expired: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-B-02
-  request_text: 采购 50 箱 A4 纸，成本中心 CC-1001
+  request_text: 采购 50 箱 一次性无菌注射器，成本中心 CC-1001
   quantity: 50
   faults:
     supplier_b_expired: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-B-03
-  request_text: 采购 50 箱 A4 纸（复测）
+  request_text: 采购 50 箱 一次性无菌注射器（复测）
   quantity: 50
   faults:
     supplier_b_expired: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-B-04
-  request_text: 采购 50 箱 A4 纸，下周一到货
+  request_text: 采购 50 箱 一次性无菌注射器，下周一到货
   quantity: 50
   faults:
     supplier_b_expired: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-B-05
-  request_text: 采购 50 箱 A4 纸，优先 A 类
+  request_text: 采购 50 箱 一次性无菌注射器，优先 A 类
   quantity: 50
   faults:
     supplier_b_expired: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-C-01
-  request_text: 采购 50 箱 A4 纸（供应商 C 停报）
+  request_text: 采购 50 箱 一次性无菌注射器（供应商 C 停报）
   quantity: 50
   faults:
     supplier_c_no_quote: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-C-02
-  request_text: 采购 50 箱 A4 纸，成本中心 CC-1001
+  request_text: 采购 50 箱 一次性无菌注射器，成本中心 CC-1001
   quantity: 50
   faults:
     supplier_c_no_quote: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-C-03
-  request_text: 采购 50 箱 A4 纸（复测）
+  request_text: 采购 50 箱 一次性无菌注射器（复测）
   quantity: 50
   faults:
     supplier_c_no_quote: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-C-04
-  request_text: 采购 50 箱 A4 纸，下周一到货
+  request_text: 采购 50 箱 一次性无菌注射器，下周一到货
   quantity: 50
   faults:
     supplier_c_no_quote: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-C-05
-  request_text: 采购 50 箱 A4 纸，常规补货
+  request_text: 采购 50 箱 一次性无菌注射器，常规补货
   quantity: 50
   faults:
     supplier_c_no_quote: true
   expect_state: COMPLETED
   expect_approval: false
 - id: F-P-01
-  request_text: 采购 3000 箱 A4 纸（报价整体上浮）
+  request_text: 采购 3000 箱 一次性无菌注射器（报价整体上浮）
   quantity: 3000
   faults:
     all_quotes_over_budget: true
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: F-P-02
-  request_text: 采购 3000 箱 A4 纸，年度备货
+  request_text: 采购 3000 箱 一次性无菌注射器，年度备货
   quantity: 3000
   faults:
     all_quotes_over_budget: true
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: F-P-03
-  request_text: 采购 3000 箱 A4 纸，成本中心 CC-1001
+  request_text: 采购 3000 箱 一次性无菌注射器，成本中心 CC-1001
   quantity: 3000
   faults:
     all_quotes_over_budget: true
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: F-P-04
-  request_text: 采购 3000 箱 A4 纸，集中采购
+  request_text: 采购 3000 箱 一次性无菌注射器，集中采购
   quantity: 3000
   faults:
     all_quotes_over_budget: true
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: F-P-05
-  request_text: 采购 3000 箱 A4 纸，预算充足
+  request_text: 采购 3000 箱 一次性无菌注射器，预算充足
   quantity: 3000
   faults:
     all_quotes_over_budget: true
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: X-01
-  request_text: 采购 3000 箱 A4 纸（B 资质异常 + 报价上浮）
+  request_text: 采购 3000 箱 一次性无菌注射器（B 资质异常 + 报价上浮）
   quantity: 3000
   faults:
     supplier_b_expired: true
@@ -184,7 +184,7 @@
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: X-02
-  request_text: 采购 3000 箱 A4 纸（C 停报 + 报价上浮）
+  request_text: 采购 3000 箱 一次性无菌注射器（C 停报 + 报价上浮）
   quantity: 3000
   faults:
     supplier_c_no_quote: true
@@ -192,7 +192,7 @@
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: X-03
-  request_text: 采购 3000 箱 A4 纸（三类故障同时开启）
+  request_text: 采购 3000 箱 一次性无菌注射器（三类故障同时开启）
   quantity: 3000
   faults:
     supplier_b_expired: true

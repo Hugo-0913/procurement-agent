@@ -29,8 +29,8 @@ CONFIG = ProcurementConfig(50000.0, 3, 12000, 2, 30)
 MULTI_RESPONSE = """
 {
   "items": [
-    {"material_name": "A4 纸", "quantity": 50, "unit": "箱"},
-    {"material_name": "订书机", "quantity": 20, "unit": "个"}
+    {"material_name": "一次性无菌注射器", "quantity": 50, "unit": "箱"},
+    {"material_name": "医用外科口罩", "quantity": 20, "unit": "个"}
   ],
   "cost_center": "CC-1001",
   "expected_date": null
@@ -47,9 +47,9 @@ def make_env(tmp_path):
 
 def test_seed_has_two_materials(tmp_path):
     repo, _ = make_env(tmp_path)
-    assert repo.find_material_by_name("A4 纸") is not None
-    assert repo.find_material_by_name("订书机") is not None
-    stapler = repo.find_material_by_name("订书机")
+    assert repo.find_material_by_name("一次性无菌注射器") is not None
+    assert repo.find_material_by_name("医用外科口罩") is not None
+    stapler = repo.find_material_by_name("医用外科口罩")
     assert len(repo.list_quotes(stapler.id)) == 3
 
 
@@ -58,7 +58,7 @@ def test_sourcing_payload_roundtrip_for_multiple_items(tmp_path):
     config = CONFIG
     qualified = run_qualification(repo, config, 1)
     results = []
-    for sku, quantity in (("A4 纸", 50), ("订书机", 20)):
+    for sku, quantity in (("一次性无菌注射器", 50), ("医用外科口罩", 20)):
         material = repo.find_material_by_name(sku)
         outcome = run_sourcing(repo, config, material.id, quantity, qualified)
         results.append(
@@ -110,7 +110,7 @@ def test_multi_item_task_creates_one_order_per_item(tmp_path):
         model_factory=FixedModelFactory([MULTI_RESPONSE], agent_mode=True),
     )
     runner = TaskRunner(store, build_stage_graph(store, build_handlers(deps), CONFIG))
-    task_id = runner.start("采购 50 箱 A4 纸和 20 个订书机，成本中心 CC-1001")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器和 20 盒医用外科口罩，成本中心 CC-1001")
 
     record = store.get_task(task_id)
     assert record.state is TaskState.COMPLETED
@@ -119,8 +119,8 @@ def test_multi_item_task_creates_one_order_per_item(tmp_path):
     orders = repo.list_orders()
     assert len(orders) == 2
     assert {order.material_id for order in orders} == {
-        repo.find_material_by_name("A4 纸").id,
-        repo.find_material_by_name("订书机").id,
+        repo.find_material_by_name("一次性无菌注射器").id,
+        repo.find_material_by_name("医用外科口罩").id,
     }
     assert sum(order.total_amount for order in orders) > 0
 
@@ -132,8 +132,8 @@ def test_multi_item_clarifies_when_one_item_unknown(tmp_path):
     store = TaskStore(engine)
     bad = """
     {"items": [
-      {"material_name": "A4 纸", "quantity": 50},
-      {"material_name": "投影仪", "quantity": 1}
+      {"material_name": "一次性无菌注射器", "quantity": 50},
+      {"material_name": "呼吸机", "quantity": 1}
     ]}
     """
     deps = CoordinatorDeps(
@@ -146,11 +146,11 @@ def test_multi_item_clarifies_when_one_item_unknown(tmp_path):
         model_factory=FixedModelFactory([bad], agent_mode=True),
     )
     runner = TaskRunner(store, build_stage_graph(store, build_handlers(deps), CONFIG))
-    task_id = runner.start("采购 50 箱 A4 纸和 1 台投影仪")
+    task_id = runner.start("采购 50 箱 一次性无菌注射器和 1 台呼吸机")
 
     record = store.get_task(task_id)
     assert record.state is TaskState.AWAITING_CLARIFICATION
     requested = [
         e for e in store.list_events(task_id) if e.event_type == "clarification_requested"
     ]
-    assert "投影仪" in requested[0].payload["question"]
+    assert "呼吸机" in requested[0].payload["question"]

@@ -33,7 +33,7 @@ def build_env(tmp_path: Path) -> SimpleNamespace:
     seed_demo_data(engine)
     faults = FaultRegistry(engine)
     repo = ErpRepository(engine, faults)
-    material = repo.find_material_by_name("A4 纸")
+    material = repo.find_material_by_name("一次性无菌注射器")
     return SimpleNamespace(
         engine=engine,
         faults=faults,
@@ -56,7 +56,7 @@ def make_offline_app(tmp_path, quantity: int = 50, cases_path=None):
 
     response = json.dumps(
         {
-            "material_name": "A4 纸",
+            "material_name": "一次性无菌注射器",
             "quantity": quantity,
             "unit": "箱",
             "expected_date": None,

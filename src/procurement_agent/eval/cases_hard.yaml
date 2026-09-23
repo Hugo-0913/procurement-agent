@@ -1,62 +1,62 @@
 # 高难度用例：故意包含模糊表述、别名、边界数量与不可行约束，
 # 用于暴露真实失败模式。期望值按"系统应表现出的正确行为"填写。
 - id: H-01
-  request_text: 帮我买点办公用纸
+  request_text: 帮我买点无菌注射器
   quantity: 0
   faults: {}
   expect_state: AWAITING_CLARIFICATION
   expect_approval: false
 - id: H-02
-  request_text: 采购 10 个鼠标
+  request_text: 采购 10 台呼吸机
   quantity: 10
   faults: {}
   expect_state: AWAITING_CLARIFICATION
   expect_approval: false
 - id: H-03
-  request_text: 采购 50 箱 A4复印纸，成本中心 CC-1001
+  request_text: 采购 50 箱 无菌注射器，成本中心 CC-1001
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: H-04
-  request_text: 采购 50 箱 A4 纸（别称与空格混用）
+  request_text: 采购 50 箱 一次性无菌注射器（别称与空格混用）
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: H-05
-  request_text: 采购 10000 箱 A4 纸，成本中心 CC-1001
+  request_text: 采购 10000 箱 一次性无菌注射器，成本中心 CC-1001
   quantity: 10000
   faults: {}
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: H-06
-  request_text: 紧急采购 3000 箱 A4 纸，明天必须到货
+  request_text: 紧急采购 3000 箱 一次性无菌注射器，明天必须到货
   quantity: 3000
   faults: {}
   expect_state: AWAITING_APPROVAL
   expect_approval: true
 - id: H-07
-  request_text: 采购 50 箱 A4 纸，预算只有 500 元
+  request_text: 采购 50 箱 一次性无菌注射器，预算只有 500 元
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: H-08
-  request_text: 采购 50 箱 A4 纸，走加急流程，成本中心 CC-9999
+  request_text: 采购 50 箱 一次性无菌注射器，走加急流程，成本中心 CC-9999
   quantity: 50
   faults: {}
   expect_state: COMPLETED
   expect_approval: false
 - id: H-09
-  request_text: 采购 50 箱 A4 纸，但供应商只能报一家
+  request_text: 采购 50 箱 一次性无菌注射器，但供应商只能报一家
   quantity: 50
   faults:
     supplier_c_no_quote: true
   expect_state: COMPLETED
   expect_approval: false
 - id: H-10
-  request_text: 采购 50 箱 A4 纸，供应商资质都有问题
+  request_text: 采购 50 箱 一次性无菌注射器，供应商资质都有问题
   quantity: 50
   faults:
     supplier_b_expired: true

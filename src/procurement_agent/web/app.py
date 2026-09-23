@@ -98,7 +98,7 @@ def create_app(
     runner = TaskRunner(store, graph)
 
     templates = Jinja2Templates(directory=str(WEB_ROOT / "templates"))
-    app = FastAPI(title="耗材采购自动化 Agent 系统")
+    app = FastAPI(title="医用耗材采购自动化 Agent 系统")
     ctx = WebContext(
         config=config,
         repo=repo,

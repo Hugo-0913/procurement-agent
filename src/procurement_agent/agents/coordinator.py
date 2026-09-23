@@ -58,11 +58,17 @@ def normalize_items(deps: CoordinatorDeps, parsed: dict[str, Any]) -> tuple[list
     for entry in raw_items:
         name = entry.get("material_name")
         quantity = entry.get("quantity")
-        if not name or not quantity:
+        material = None
+        if entry.get("material_id"):
+            material = deps.repo.get_material(int(entry["material_id"]))
+        elif name:
+            material = deps.repo.find_material_by_name(str(name))
+        if material is None and (name or entry.get("material_id")):
+            return [], f"物料主数据中找不到「{name or entry.get('material_id')}」，请确认物料名称。"
+        if not name and material is None:
             return [], "需求里缺少物料名称或数量，请补充后我再继续比价与下单。"
-        material = deps.repo.find_material_by_name(str(name))
-        if material is None:
-            return [], f"物料主数据中找不到「{name}」，请确认物料名称。"
+        if not quantity:
+            return [], "需求里缺少物料名称或数量，请补充后我再继续比价与下单。"
         items.append(
             {
                 "material_id": material.id,
@@ -232,29 +238,56 @@ def build_handlers(deps: CoordinatorDeps):
         if deps.memory is not None:
             block = deps.memory.render_prompt_block()
             _event(deps, task_id, "coordinator", "memory_loaded", {"summary": block})
-        loaded = set(context.get("loaded_skills", []))
-        if "requirement_parsing" not in loaded:
-            _load_skill(deps, task_id, "coordinator", "requirement_parsing")
-            loaded.add("requirement_parsing")
 
         record = deps.store.get_task(task_id)
-        model = deps.model_factory()
-        prompt = build_parse_prompt(deps.skills.render_index(), record.request_text)
-        _event(deps, task_id, "coordinator", "tool_call", {"tool": "requirement_parser"})
+        prefilled = context.get("prefilled") or {}
+        loaded = set(context.get("loaded_skills", []))
 
-        def parse_once() -> dict[str, Any]:
-            """模型调用与结构化校验放在同一个可重试单元内：
-            模型返回非法 JSON 时按可重试错误处理，而不是直接判失败。"""
-            raw = model.invoke([{"role": "user", "content": prompt}])
-            TokenUsageCallback(deps.store, task_id).record_message(raw)
-            return json.loads(response_text(raw))
+        if prefilled.get("items"):
+            # 点选式下单：物料与数量由用户直接选择，跳过模型解析，
+            # 因此这里不加载需求解析技能（页面上的技能状态会如实反映这一点）。
+            parsed = {
+                "items": prefilled["items"],
+                "cost_center": prefilled.get("cost_center"),
+                "expected_date": prefilled.get("expected_date"),
+                "budget": None,
+                "note": None,
+                "source": "form",
+            }
+            _event(
+                deps,
+                task_id,
+                "coordinator",
+                "tool_result",
+                {"tool": "requirement_parser", "summary": "用户直接选择了物料，跳过解析"},
+            )
+        else:
+            if "requirement_parsing" not in loaded:
+                _load_skill(deps, task_id, "coordinator", "requirement_parsing")
+                loaded.add("requirement_parsing")
 
-        parsed = _call_subagent(deps, task_id, "coordinator", parse_once)
-        # 模型常把"下周一"原样返回，这里用确定性规则换算为 ISO 日期
+            model = deps.model_factory()
+            prompt = build_parse_prompt(deps.skills.render_index(), record.request_text)
+            _event(deps, task_id, "coordinator", "tool_call", {"tool": "requirement_parser"})
+
+            def parse_once() -> dict[str, Any]:
+                """模型调用与结构化校验放在同一个可重试单元内：
+                模型返回非法 JSON 时按可重试错误处理，而不是直接判失败。"""
+                raw = model.invoke([{"role": "user", "content": prompt}])
+                TokenUsageCallback(deps.store, task_id).record_message(raw)
+                return json.loads(response_text(raw))
+
+            parsed = _call_subagent(deps, task_id, "coordinator", parse_once)
+            # 模型常把"下周一"原样返回，这里用确定性规则换算为 ISO 日期
+            if not is_iso_date(parsed.get("expected_date")):
+                parsed["expected_date"] = parse_relative_date(
+                    parsed.get("expected_date")
+                ) or parse_relative_date(record.request_text)
+
         if not is_iso_date(parsed.get("expected_date")):
-            parsed["expected_date"] = parse_relative_date(
-                parsed.get("expected_date")
-            ) or parse_relative_date(record.request_text)
+            parsed["expected_date"] = parse_relative_date(parsed.get("expected_date")) or parsed.get(
+                "expected_date"
+            )
         _event(
             deps,
             task_id,

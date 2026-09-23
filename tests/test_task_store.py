@@ -13,7 +13,7 @@ def make_store(tmp_path: Path) -> TaskStore:
 
 def test_create_task_starts_pending(tmp_path):
     store = make_store(tmp_path)
-    task_id = store.create_task("采购 50 箱 A4 纸")
+    task_id = store.create_task("采购 50 箱 一次性无菌注射器")
     record = store.get_task(task_id)
     assert record.state is TaskState.PENDING
     assert record.finished_at is None
@@ -91,9 +91,9 @@ def test_list_tasks_filters_by_state(tmp_path):
 def test_set_structured_request(tmp_path):
     store = make_store(tmp_path)
     task_id = store.create_task("x")
-    store.set_structured_request(task_id, {"quantity": 50, "material": "A4 纸"})
+    store.set_structured_request(task_id, {"quantity": 50, "material": "一次性无菌注射器"})
     assert store.get_task(task_id).structured_request == {
         "quantity": 50,
-        "material": "A4 纸",
+        "material": "一次性无菌注射器",
     }
 

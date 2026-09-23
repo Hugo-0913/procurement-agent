@@ -15,9 +15,9 @@ ALL_QUOTES_OVER_BUDGET = "all_quotes_over_budget"
 ALL_FLAGS = (SUPPLIER_B_EXPIRED, SUPPLIER_C_NO_QUOTE, ALL_QUOTES_OVER_BUDGET)
 
 FLAG_LABELS = {
-    SUPPLIER_B_EXPIRED: "让供应商 B 资质过期",
-    SUPPLIER_C_NO_QUOTE: "让供应商 C 停止报价",
-    ALL_QUOTES_OVER_BUDGET: "让全部报价超预算",
+    SUPPLIER_B_EXPIRED: "让瑞康医械供应链的经营许可证过期",
+    SUPPLIER_C_NO_QUOTE: "让济生医疗科技停止报价",
+    ALL_QUOTES_OVER_BUDGET: "让全部报价涨到三倍",
 }
 
 
@@ -50,4 +50,3 @@ class FaultRegistry:
         for row in rows:
             result[row.flag] = bool(row.enabled)
         return result
-

@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}数据台 · 耗材采购自动化 Agent{% endblock %}
+{% block title %}数据台 · 医用耗材采购自动化 Agent{% endblock %}
 {% block content %}
 <div class="grid2">
   <section class="panel">
     <div class="row">
-      <button class="chip active" id="tab-suppliers">供应商</button>
-      <button class="chip" id="tab-quotes">报价</button>
-      <button class="chip" id="tab-orders">订单</button>
+      <button class="chip active" id="tab-suppliers">供应商能不能用</button>
+      <button class="chip" id="tab-quotes">谁家报价划算</button>
+      <button class="chip" id="tab-orders">买到的东西</button>
     </div>
     <div id="data-table"></div>
   </section>
 
   <section class="panel" id="fault-panel">
-    <h3>故障注入</h3>
-    <p class="hint">打开开关后回到执行页重新发起任务，可演示异常处理路径。</p>
+    <h3>模拟异常情况</h3>
+    <p class="hint">打开任意开关后，回首页重新提交一次采购，就能看到系统怎么处理这些坏情况。开关是临时的，随时可以关掉。</p>
     <div id="fault-list">
       {% for flag in fault_flags %}
       <label class="switch">

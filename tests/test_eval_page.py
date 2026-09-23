@@ -10,7 +10,7 @@ def write_small_cases(tmp_path):
     data = [
         {
             "id": "E-1",
-            "request_text": "采购 50 箱 A4 纸",
+            "request_text": "采购 50 箱 一次性无菌注射器",
             "quantity": 50,
             "faults": {},
             "expect_state": "COMPLETED",
@@ -18,7 +18,7 @@ def write_small_cases(tmp_path):
         },
         {
             "id": "E-2",
-            "request_text": "采购 3000 箱 A4 纸",
+            "request_text": "采购 3000 箱 一次性无菌注射器",
             "quantity": 3000,
             "faults": {"all_quotes_over_budget": True},
             "expect_state": "AWAITING_APPROVAL",

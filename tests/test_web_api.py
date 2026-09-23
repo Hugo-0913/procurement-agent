@@ -5,7 +5,7 @@ from tests.conftest import make_offline_app, make_client, wait_for_state
 
 async def test_create_task_returns_id(offline_app):
     async with await make_client(offline_app) as client:
-        res = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        res = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         assert res.status_code == 200
         assert res.json()["task_id"].startswith("t-")
 
@@ -18,7 +18,7 @@ async def test_blank_request_rejected(offline_app):
 
 async def test_task_list_contains_created_task(offline_app):
     async with await make_client(offline_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         res = await client.get("/api/tasks")
@@ -28,7 +28,7 @@ async def test_task_list_contains_created_task(offline_app):
 
 async def test_task_detail_has_state_and_events(offline_app):
     async with await make_client(offline_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         detail = (await client.get(f"/api/tasks/{task_id}")).json()
@@ -47,7 +47,7 @@ async def test_unknown_task_returns_404(offline_app):
 
 async def test_reject_without_reason_returns_422(big_order_app):
     async with await make_client(big_order_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"AWAITING_APPROVAL"})
         res = await client.post(
@@ -59,7 +59,7 @@ async def test_reject_without_reason_returns_422(big_order_app):
 
 async def test_orders_endpoint_reflects_created_order(offline_app):
     async with await make_client(offline_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         orders = (await client.get("/api/orders")).json()
@@ -86,7 +86,61 @@ async def test_suppliers_and_quotes_endpoints(offline_app):
         suppliers = (await client.get("/api/suppliers")).json()
         assert len(suppliers) == 4
         quotes = (await client.get("/api/quotes")).json()
-        assert len(quotes) == 3
+        # 不传 material_id 时返回全部物料的报价，便于横向比价
+        assert len(quotes) == 6
+        assert {q["material_name"] for q in quotes} == {"一次性无菌注射器", "医用外科口罩"}
+
+
+async def test_materials_and_cost_centers_endpoints(offline_app):
+    async with await make_client(offline_app) as client:
+        materials = (await client.get("/api/materials")).json()
+        assert [m["name"] for m in materials] == ["一次性无菌注射器", "医用外科口罩"]
+        assert all(m["unit"] for m in materials)
+        centers = (await client.get("/api/cost-centers")).json()
+        assert any(c["code"] == "CC-1001" for c in centers)
+
+
+async def test_selection_path_skips_model_parsing(offline_app):
+    """点选式下单必须跳过模型解析：不加载需求解析技能，也不产生解析工具调用。"""
+    async with await make_client(offline_app) as client:
+        materials = (await client.get("/api/materials")).json()
+        first = materials[0]
+        created = await client.post(
+            "/api/tasks",
+            json={
+                "items": [{"material_id": first["id"], "quantity": 50}],
+                "cost_center": "CC-3007",
+            },
+        )
+        assert created.status_code == 200
+        task_id = created.json()["task_id"]
+        detail = await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
+
+        assert detail["state"] == "COMPLETED"
+        assert detail["request_items"][0]["quantity"] == 50
+        # 用户直接选了物料，没有走模型解析，因此不该声称加载了解析技能
+        assert "requirement_parsing" not in detail["loaded_skills"]
+        assert "requirement_parsing" in detail["metadata_only_skills"]
+        assert not [
+            e
+            for e in detail["events"]
+            if e["event_type"] == "tool_call" and e["payload"].get("tool") == "requirement_parser"
+        ]
+        assert detail["order_id"] is not None
+
+
+async def test_selection_rejects_bad_input(offline_app):
+    async with await make_client(offline_app) as client:
+        empty = await client.post("/api/tasks", json={})
+        assert empty.status_code == 422
+        zero = await client.post(
+            "/api/tasks", json={"items": [{"material_id": 1, "quantity": 0}]}
+        )
+        assert zero.status_code == 422
+        missing = await client.post(
+            "/api/tasks", json={"items": [{"material_id": 9999, "quantity": 5}]}
+        )
+        assert missing.status_code == 422
 
 
 async def test_auto_mode_falls_back_to_offline_without_key(tmp_path, monkeypatch):
@@ -98,7 +152,7 @@ async def test_auto_mode_falls_back_to_offline_without_key(tmp_path, monkeypatch
     assert app.state.offline is True
 
     async with await make_client(app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         detail = await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         assert detail["state"] == "COMPLETED"
@@ -122,7 +176,7 @@ async def test_explicit_offline_false_requires_key(tmp_path, monkeypatch):
     app = create_app(tmp_path / "live.db", offline=False)
     assert app.state.offline is False
     async with await make_client(app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         detail = await wait_for_state(client, task_id, {"FAILED", "COMPLETED"})
         assert detail["state"] == "FAILED"
@@ -146,7 +200,7 @@ async def test_offline_parser_drives_approval_flow(tmp_path, monkeypatch):
     app = create_app(tmp_path / "parser.db")
     async with await make_client(app) as client:
         created = await client.post(
-            "/api/tasks", json={"request_text": "采购 3000 箱 A4 纸，成本中心 CC-1001"}
+            "/api/tasks", json={"request_text": "采购 3000 箱 一次性无菌注射器，成本中心 CC-1001"}
         )
         task_id = created.json()["task_id"]
         detail = await wait_for_state(client, task_id, {"AWAITING_APPROVAL", "FAILED"})
@@ -161,7 +215,7 @@ async def test_vague_request_asks_for_clarification(tmp_path, monkeypatch):
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     app = create_app(tmp_path / "clarify.db")
     async with await make_client(app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "帮我再采购一些纸"})
+        created = await client.post("/api/tasks", json={"request_text": "帮我再采购一些注射器"})
         task_id = created.json()["task_id"]
         detail = await wait_for_state(
             client, task_id, {"AWAITING_CLARIFICATION", "COMPLETED", "FAILED"}
@@ -186,11 +240,11 @@ async def test_clarification_endpoint_completes_task(tmp_path, monkeypatch):
         offline=True,
         offline_script=[
             # 第一次解析：数量缺失，触发澄清
-            json.dumps({"material_name": "A4 纸", "quantity": None}, ensure_ascii=False),
+            json.dumps({"material_name": "一次性无菌注射器", "quantity": None}, ensure_ascii=False),
             # 用户补充后再解析：信息完整
             json.dumps(
                 {
-                    "material_name": "A4 纸",
+                    "material_name": "一次性无菌注射器",
                     "quantity": 50,
                     "unit": "箱",
                     "expected_date": None,
@@ -203,7 +257,7 @@ async def test_clarification_endpoint_completes_task(tmp_path, monkeypatch):
         ],
     )
     async with await make_client(app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "帮我买点办公用纸"})
+        created = await client.post("/api/tasks", json={"request_text": "帮我买点无菌注射器"})
         task_id = created.json()["task_id"]
         detail = await wait_for_state(client, task_id, {"AWAITING_CLARIFICATION"})
         assert detail["state"] == "AWAITING_CLARIFICATION"
@@ -224,7 +278,7 @@ async def test_clarification_endpoint_completes_task(tmp_path, monkeypatch):
 
 async def test_clarification_rejected_when_not_needed(offline_app):
     async with await make_client(offline_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 50 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         res = await client.post(
@@ -236,7 +290,7 @@ async def test_clarification_rejected_when_not_needed(offline_app):
 async def test_approval_is_recorded_and_queryable(big_order_app):
     """审批留痕要能通过接口查到，而不是只躺在事件流里。"""
     async with await make_client(big_order_app) as client:
-        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 A4 纸"})
+        created = await client.post("/api/tasks", json={"request_text": "采购 3000 箱 一次性无菌注射器"})
         task_id = created.json()["task_id"]
         await wait_for_state(client, task_id, {"AWAITING_APPROVAL"})
 

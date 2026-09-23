@@ -1,31 +1,96 @@
+/* 数据台：只回答三个业务问题
+   1) 这家供应商能不能供货？不能是因为什么？
+   2) 同一种耗材，谁家报价划算？
+   3) 我们买到了什么？
+   技术字段（证书编号、内部状态码之类）不在这里展示。 */
+
 let currentTab = "suppliers";
+
+function availability(supplier) {
+  if (supplier.blacklisted) {
+    return { text: "不可供货", tone: "red", reason: "已被列入黑名单" };
+  }
+  if (supplier.expiring_soon) {
+    return { text: "可供货（需审批）", tone: "orange", reason: "经营许可证 30 天内到期" };
+  }
+  return { text: "可供货", tone: "green", reason: "资质齐全且在有效期内" };
+}
 
 async function loadData() {
   const res = await fetch(`/api/${currentTab}`);
   const rows = await res.json();
   const root = document.getElementById("data-table");
+
   if (!rows.length) {
     root.innerHTML = '<p class="empty">暂无数据</p>';
     return;
   }
+
   if (currentTab === "suppliers") {
-    root.innerHTML = `<table class="data"><tr><th>编码</th><th>名称</th><th>等级</th><th>资质到期</th><th>状态</th></tr>` +
-      rows.map((r) => `<tr class="${r.blacklisted ? "blacklisted" : r.expiring_soon ? "expiring" : ""}">
-        <td>${r.code}</td><td>${r.name}</td><td>${r.tier}</td><td>${r.expires_at || "-"}</td>
-        <td>${r.blacklisted ? "黑名单" : r.expiring_soon ? "资质临期" : "正常"}</td></tr>`).join("") +
+    root.innerHTML =
+      `<table class="data"><tr><th>供应商</th><th>等级</th><th>能不能供货</th><th>说明</th><th>资质到期</th></tr>` +
+      rows
+        .map((r) => {
+          const state = availability(r);
+          return `<tr class="${r.blacklisted ? "blacklisted" : r.expiring_soon ? "expiring" : ""}">
+            <td>${r.name}</td>
+            <td>${r.tier} 类</td>
+            <td><span class="badge ${state.tone}">${state.text}</span></td>
+            <td class="hint">${state.reason}</td>
+            <td>${r.expires_at || "-"}</td>
+          </tr>`;
+        })
+        .join("") +
       `</table>`;
-  } else if (currentTab === "quotes") {
-    root.innerHTML = `<table class="data"><tr><th>供应商</th><th>单价</th><th>运费</th><th>交期</th><th>有效期</th></tr>` +
-      rows.map((r) => `<tr><td>${r.supplier_name}</td><td>¥${r.unit_price.toFixed(2)}</td>
-        <td>¥${r.freight.toFixed(2)}</td><td>${r.lead_days} 天</td><td>${r.valid_until}</td></tr>`).join("") +
-      `</table>`;
-  } else {
-    root.innerHTML = `<table class="data"><tr><th>订单号</th><th>供应商</th><th>数量</th><th>总额</th><th>状态</th><th>任务</th></tr>` +
-      rows.map((r) => `<tr data-task="${r.task_id}"><td>#${r.id}</td><td>${r.supplier_name}</td>
-        <td>${r.quantity}</td><td>¥${r.total_amount.toFixed(2)}</td><td>${r.status}</td>
-        <td><a href="/tasks/${r.task_id}">查看</a></td></tr>`).join("") +
-      `</table>`;
+    return;
   }
+
+  if (currentTab === "quotes") {
+    // 按物料分组，组内标出单价最低的一家
+    const groups = {};
+    rows.forEach((r) => {
+      (groups[r.material_name] ||= []).push(r);
+    });
+    root.innerHTML = Object.entries(groups)
+      .map(([material, list]) => {
+        const cheapest = Math.min(...list.map((q) => q.unit_price));
+        return (
+          `<h3 style="margin-top:12px">${material}（按${list[0].unit}计价）</h3>` +
+          `<table class="data"><tr><th>供应商</th><th>单价</th><th>运费</th><th>到货时间</th><th>说明</th></tr>` +
+          list
+            .map(
+              (q) => `<tr>
+                <td>${q.supplier_name}</td>
+                <td>¥${q.unit_price.toFixed(2)}</td>
+                <td>${q.freight > 0 ? "¥" + q.freight.toFixed(2) : "包邮"}</td>
+                <td>${q.lead_days} 天</td>
+                <td class="hint">${q.unit_price === cheapest ? "单价最低" : "单价高 ¥" + (q.unit_price - cheapest).toFixed(2)}</td>
+              </tr>`
+            )
+            .join("") +
+          `</table>`
+        );
+      })
+      .join("");
+    return;
+  }
+
+  root.innerHTML =
+    `<table class="data"><tr><th>订单号</th><th>物料</th><th>数量</th><th>金额</th><th>供应商</th><th>状态</th><th></th></tr>` +
+    rows
+      .map(
+        (r) => `<tr>
+          <td>#${r.id}</td>
+          <td>${r.material_name}</td>
+          <td>${r.quantity}</td>
+          <td>¥${r.total_amount.toFixed(2)}</td>
+          <td>${r.supplier_name}</td>
+          <td><span class="badge green">已下单</span></td>
+          <td><a href="/tasks/${r.task_id}">看过程</a></td>
+        </tr>`
+      )
+      .join("") +
+    `</table>`;
 }
 
 async function loadFaults() {
@@ -67,3 +132,4 @@ function bindTabs() {
 bindTabs();
 loadData();
 loadFaults();
+
