@@ -16,25 +16,27 @@
   </div>
 
   <div id="entry-pick" class="entry-panel">
-    <table class="form-table">
-      <thead>
-        <tr><th style="width:52%">采购物料</th><th style="width:22%">数量</th><th style="width:14%">单位</th><th></th></tr>
-      </thead>
-      <tbody id="item-rows"></tbody>
-    </table>
-    <div class="row">
-      <button class="ghost" id="btn-add-row">+ 再加一项物料</button>
-      <span class="hint">只能采购采购目录内的物料；目录外的需求请用「说着买」提出</span>
+    <div class="pick-block">
+      <div class="pick-head">
+        <span>采购物料</span><span>数量</span><span>单位</span><span></span>
+      </div>
+      <div id="item-rows"></div>
+      <button class="add-row" id="btn-add-row" type="button">+ 再加一项物料</button>
     </div>
-    <div class="row" style="margin-top:14px">
-      <label class="field">期望到货
+
+    <div class="pick-meta">
+      <label class="field"><span>期望到货</span>
         <input type="date" id="expected-date">
       </label>
-      <label class="field">成本中心
+      <label class="field"><span>成本中心</span>
         <select id="cost-center"></select>
       </label>
+      <div class="pick-note hint">
+        只能采购目录内的耗材；目录外的需求请用「说着买」提出
+      </div>
     </div>
-    <div class="row" style="margin-top:14px">
+
+    <div class="row pick-actions">
       <button id="btn-submit-pick" class="primary">提交采购单</button>
       <span id="pick-hint" class="hint"></span>
     </div>
@@ -65,5 +67,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/board.js"></script>
+<script src="/static/board.js?v={{ asset_version }}"></script>
 {% endblock %}

@@ -5,14 +5,13 @@
   <section class="panel">
     <div class="row">
       <button class="chip active" id="tab-suppliers">供应商能不能用</button>
-      <button class="chip" id="tab-quotes">谁家报价划算</button>
-      <button class="chip" id="tab-orders">买到的东西</button>
+      <button class="chip" id="tab-orders">我的订单</button>
     </div>
     <div id="data-table"></div>
   </section>
 
   <section class="panel" id="fault-panel">
-    <h3>模拟异常情况</h3>
+    <div class="panel-head"><h3>模拟异常情况</h3></div>
     <p class="hint">打开任意开关后，回首页重新提交一次采购，就能看到系统怎么处理这些坏情况。开关是临时的，随时可以关掉。</p>
     <div id="fault-list">
       {% for flag in fault_flags %}
@@ -26,5 +25,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/data.js"></script>
+<script src="/static/data.js?v={{ asset_version }}"></script>
 {% endblock %}

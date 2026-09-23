@@ -45,38 +45,8 @@ async function loadData() {
     return;
   }
 
-  if (currentTab === "quotes") {
-    // 按物料分组，组内标出单价最低的一家
-    const groups = {};
-    rows.forEach((r) => {
-      (groups[r.material_name] ||= []).push(r);
-    });
-    root.innerHTML = Object.entries(groups)
-      .map(([material, list]) => {
-        const cheapest = Math.min(...list.map((q) => q.unit_price));
-        return (
-          `<h3 style="margin-top:12px">${material}（按${list[0].unit}计价）</h3>` +
-          `<table class="data"><tr><th>供应商</th><th>单价</th><th>运费</th><th>到货时间</th><th>说明</th></tr>` +
-          list
-            .map(
-              (q) => `<tr>
-                <td>${q.supplier_name}</td>
-                <td>¥${q.unit_price.toFixed(2)}</td>
-                <td>${q.freight > 0 ? "¥" + q.freight.toFixed(2) : "包邮"}</td>
-                <td>${q.lead_days} 天</td>
-                <td class="hint">${q.unit_price === cheapest ? "单价最低" : "单价高 ¥" + (q.unit_price - cheapest).toFixed(2)}</td>
-              </tr>`
-            )
-            .join("") +
-          `</table>`
-        );
-      })
-      .join("");
-    return;
-  }
-
   root.innerHTML =
-    `<table class="data"><tr><th>订单号</th><th>物料</th><th>数量</th><th>金额</th><th>供应商</th><th>状态</th><th></th></tr>` +
+    `<table class="data"><tr><th>订单号</th><th>物料</th><th>数量</th><th>金额</th><th>供应商</th><th>状态</th><th>操作</th></tr>` +
     rows
       .map(
         (r) => `<tr>
@@ -86,7 +56,7 @@ async function loadData() {
           <td>¥${r.total_amount.toFixed(2)}</td>
           <td>${r.supplier_name}</td>
           <td><span class="badge green">已下单</span></td>
-          <td><a href="/tasks/${r.task_id}">看过程</a></td>
+          <td><a href="/tasks/${r.task_id}">查看采购过程</a></td>
         </tr>`
       )
       .join("") +
@@ -118,10 +88,10 @@ async function loadFaults() {
 }
 
 function bindTabs() {
-  ["suppliers", "quotes", "orders"].forEach((tab) => {
+  ["suppliers", "orders"].forEach((tab) => {
     document.getElementById("tab-" + tab).onclick = () => {
       currentTab = tab;
-      ["suppliers", "quotes", "orders"].forEach((t) =>
+      ["suppliers", "orders"].forEach((t) =>
         document.getElementById("tab-" + t).classList.toggle("active", t === tab)
       );
       loadData();
@@ -132,4 +102,3 @@ function bindTabs() {
 bindTabs();
 loadData();
 loadFaults();
-

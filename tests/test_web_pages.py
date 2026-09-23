@@ -50,10 +50,10 @@ async def test_data_page_renders(offline_app):
             "让全部报价涨到三倍",
         ):
             assert label in html
-        # 数据台改成了业务视角的三个问题，不再是技术字段罗列
+        # 数据台改成业务视角；只保留"供应商能不能用"与"我的订单"两个页签
         assert "供应商能不能用" in html
-        assert "谁家报价划算" in html
-        assert "买到的东西" in html
+        assert "我的订单" in html
+        assert "谁家报价划算" not in html
         assert (await client.get("/static/data.js")).status_code == 200
 
 

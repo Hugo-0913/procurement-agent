@@ -42,8 +42,8 @@
 {% endblock %}
 {% block scripts %}
 <script>window.TASK_ID = "{{ task_id }}";</script>
-<script src="/static/tree.js"></script>
-<script src="/static/timeline.js"></script>
-<script src="/static/approval.js"></script>
-<script src="/static/task.js"></script>
+<script src="/static/tree.js?v={{ asset_version }}"></script>
+<script src="/static/timeline.js?v={{ asset_version }}"></script>
+<script src="/static/approval.js?v={{ asset_version }}"></script>
+<script src="/static/task.js?v={{ asset_version }}"></script>
 {% endblock %}

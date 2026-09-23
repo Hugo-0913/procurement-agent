@@ -73,34 +73,35 @@ function materialOptions(selectedId) {
 }
 
 function addRow(materialId) {
-  const tbody = document.getElementById("item-rows");
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td><select class="row-material">${materialOptions(materialId)}</select></td>
-    <td><input class="row-quantity" type="number" min="1" step="1" value="50"></td>
-    <td class="unit"></td>
-    <td><button class="row-remove" type="button">移除</button></td>`;
-  tbody.appendChild(tr);
+  const container = document.getElementById("item-rows");
+  const row = document.createElement("div");
+  row.className = "pick-row";
+  row.innerHTML = `
+    <select class="row-material">${materialOptions(materialId)}</select>
+    <input class="row-quantity" type="number" min="1" step="1" value="50">
+    <span class="unit"></span>
+    <button class="row-remove" type="button">移除</button>`;
+  container.appendChild(row);
 
-  const select = tr.querySelector(".row-material");
-  const unitCell = tr.querySelector(".unit");
+  const select = row.querySelector(".row-material");
+  const unitCell = row.querySelector(".unit");
   const syncUnit = () => {
     const material = materials.find((m) => String(m.id) === select.value);
     unitCell.textContent = material ? material.unit : "-";
   };
   select.onchange = syncUnit;
   syncUnit();
-  tr.querySelector(".row-remove").onclick = () => {
-    if (document.querySelectorAll("#item-rows tr").length === 1) return;
-    tr.remove();
+  row.querySelector(".row-remove").onclick = () => {
+    if (document.querySelectorAll("#item-rows .pick-row").length === 1) return;
+    row.remove();
   };
 }
 
 function collectSelection() {
   const items = [];
-  document.querySelectorAll("#item-rows tr").forEach((tr) => {
-    const materialId = tr.querySelector(".row-material").value;
-    const quantity = parseInt(tr.querySelector(".row-quantity").value, 10);
+  document.querySelectorAll("#item-rows .pick-row").forEach((row) => {
+    const materialId = row.querySelector(".row-material").value;
+    const quantity = parseInt(row.querySelector(".row-quantity").value, 10);
     items.push({ material_id: Number(materialId), quantity: quantity });
   });
   return items;
@@ -133,14 +134,24 @@ async function submitSelection() {
 }
 
 async function loadCatalog() {
-  materials = await (await fetch("/api/materials")).json();
-  costCenters = await (await fetch("/api/cost-centers")).json();
+  const hint = document.getElementById("pick-hint");
+  try {
+    materials = await (await fetch("/api/materials")).json();
+    costCenters = await (await fetch("/api/cost-centers")).json();
+  } catch (err) {
+    if (hint) hint.textContent = "采购目录加载失败，请刷新页面重试";
+    return;
+  }
   const select = document.getElementById("cost-center");
   select.innerHTML = costCenters
     .map((c) => `<option value="${c.code}">${c.name}（${c.code}）</option>`)
     .join("");
   document.getElementById("item-rows").innerHTML = "";
-  addRow(materials[0]?.id);
+  if (!materials.length) {
+    if (hint) hint.textContent = "采购目录为空，请检查主数据";
+    return;
+  }
+  addRow(materials[0].id);
 }
 
 // ---------- 说着买 ----------
@@ -198,4 +209,3 @@ loadCatalog().then(() => {
   loadTasks();
   setInterval(loadTasks, 4000);
 });
-

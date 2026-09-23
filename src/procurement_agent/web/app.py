@@ -27,6 +27,10 @@ from procurement_agent.web.routes import WebContext, build_router
 WEB_ROOT = Path(__file__).parent
 logger = logging.getLogger(__name__)
 
+# 静态资源版本号：改动前端文件后必须更新它。
+# 浏览器会缓存 /static/*.js，若 HTML 与 JS 版本不匹配，页面按钮会"点了没反应"。
+ASSET_VERSION = "20260923-2"
+
 
 def default_db_path() -> Path:
     return Path("data") / "procurement.db"
@@ -98,6 +102,7 @@ def create_app(
     runner = TaskRunner(store, graph)
 
     templates = Jinja2Templates(directory=str(WEB_ROOT / "templates"))
+    templates.env.globals["asset_version"] = ASSET_VERSION
     app = FastAPI(title="医用耗材采购自动化 Agent 系统")
     ctx = WebContext(
         config=config,
@@ -113,6 +118,15 @@ def create_app(
     )
     app.include_router(build_router(ctx))
     app.mount("/static", StaticFiles(directory=str(WEB_ROOT / "static")), name="static")
+
+    @app.middleware("http")
+    async def no_cache_static(request, call_next):
+        """静态资源禁用强缓存，避免改完前端后浏览器仍用旧文件。"""
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
+
     app.state.ctx = ctx
     app.state.offline = offline
     return app
