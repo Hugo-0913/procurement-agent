@@ -126,15 +126,21 @@ function renderAll(detail) {
   renderTimeline(events);
   if (detail.pending_approval) {
     renderApproval(detail, () => refresh());
+  } else {
+    const card = document.getElementById("approval-card");
+    if (card) card.remove();
   }
   if (detail.pending_clarification) {
     renderClarification(detail, () => refresh());
+  } else {
+    const card = document.getElementById("clarify-card");
+    if (card) card.remove();
   }
 }
 
 function renderClarification(detail, onDone) {
-  const existing = document.getElementById("clarify-card");
-  if (existing) existing.remove();
+  // 卡片已经存在时直接返回：页面每 5 秒刷新一次，重建会清空用户正在输入的内容
+  if (document.getElementById("clarify-card")) return;
   const pending = detail.pending_clarification;
   if (!pending) return;
 

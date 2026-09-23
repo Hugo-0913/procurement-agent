@@ -62,3 +62,45 @@ async def test_eval_report_persisted_to_disk(tmp_path):
             await asyncio.sleep(0.25)
     assert (tmp_path / "eval_latest.json").exists()
 
+
+async def test_web_app_gets_a_default_eval_runner(tmp_path):
+    """网页版必须自带评测运行器，否则评测页点按钮只会返回 503。"""
+    import asyncio
+
+    import yaml
+
+    from procurement_agent.web.app import create_app
+
+    cases_file = tmp_path / "cases.yaml"
+    cases_file.write_text(
+        yaml.safe_dump(
+            [
+                {
+                    "id": "W-1",
+                    "request_text": "采购 50 箱一次性无菌注射器",
+                    "quantity": 50,
+                    "faults": {},
+                    "expect_state": "COMPLETED",
+                    "expect_approval": False,
+                }
+            ],
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    app = create_app(tmp_path / "default.db", offline=True)
+    assert app.state.ctx.eval_runner is not None
+    app.state.ctx.eval_runner.cases_path = cases_file
+    app.state.ctx.eval_runner.workspace = tmp_path / "runs"
+    app.state.ctx.eval_runner.output_path = tmp_path / "latest.json"
+
+    async with await make_client(app) as client:
+        assert (await client.post("/api/eval/run")).status_code == 200
+        for _ in range(120):
+            report = (await client.get("/api/eval/latest")).json()
+            if report["status"] in {"finished", "failed"}:
+                break
+            await asyncio.sleep(0.25)
+    assert report["status"] == "finished"
+    assert report["total"] == 1
+

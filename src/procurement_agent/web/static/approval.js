@@ -1,6 +1,6 @@
 function renderApproval(detail, onDone) {
-  const existing = document.getElementById("approval-card");
-  if (existing) existing.remove();
+  // 卡片已存在时不重建，否则会清空审批人正在填写的意见
+  if (document.getElementById("approval-card")) return;
   const pending = detail.pending_approval;
   if (!pending) return;
 

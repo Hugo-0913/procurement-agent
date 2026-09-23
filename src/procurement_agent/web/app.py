@@ -116,6 +116,14 @@ def create_app(
         eval_runner=eval_runner,
         offline=offline,
     )
+    if ctx.eval_runner is None:
+        # 不注入时也要给一个可用的评测运行器，否则评测页点按钮会直接 503
+        from procurement_agent.eval.runner import EvalRunner
+
+        ctx.eval_runner = EvalRunner(
+            workspace=Path("eval_results") / "web_runs",
+            output_path=Path("eval_results") / "web_latest.json",
+        )
     app.include_router(build_router(ctx))
     app.mount("/static", StaticFiles(directory=str(WEB_ROOT / "static")), name="static")
 
