@@ -108,4 +108,3 @@ class SandboxExecutor:
             stderr=self._truncate(completed.stderr or ""),
             exit_code=completed.returncode,
         )
-
