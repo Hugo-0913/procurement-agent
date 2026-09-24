@@ -23,7 +23,6 @@ from procurement_agent.middleware.context_summarizer import ContextSummarizer
 from procurement_agent.sandbox.policy import PolicyEngine
 from procurement_agent.skills_loader import SkillRegistry
 from procurement_agent.state.graph import TaskRunner, build_stage_graph
-from procurement_agent.state.models import TaskState
 from procurement_agent.state.store import TaskStore
 
 DEFAULT_CASES_PATH = Path(__file__).with_name("cases.yaml")
@@ -151,59 +150,68 @@ def _run_single_case(
     case_dir = workspace / case.id
     case_dir.mkdir(parents=True, exist_ok=True)
     engine = init_db(case_dir / "erp.db")
-    seed_demo_data(engine)
-    faults = FaultRegistry(engine)
-    for flag, enabled in case.faults.items():
-        faults.set(flag, enabled)
+    # 每条用例一个独立数据库：无论成功失败都要释放连接，否则跑一遍评测就把 30 个
+    # SQLite 文件句柄一直挂着（清理工作区时会报"文件被占用"，长期运行也会漏资源）。
+    try:
+        seed_demo_data(engine)
+        faults = FaultRegistry(engine)
+        for flag, enabled in case.faults.items():
+            faults.set(flag, enabled)
 
-    repo = ErpRepository(engine, faults)
-    store = TaskStore(engine)
-    skills = SkillRegistry()
-    # 默认不传固定脚本：让评测真正走一遍规则解析器，而不是复用预先给定的解析结果
-    factory = model_factory or offline_model_factory()
-    deps = CoordinatorDeps(
-        repo=repo,
-        store=store,
-        config=config,
-        agents_config=load_agents_config(),
-        skills=skills,
-        policy=PolicyEngine(config),
-        model_factory=factory,
-        memory=MemoryStore(engine, config),
-        summarizer=ContextSummarizer(config, factory),
-    )
-    graph = build_stage_graph(store, build_handlers(deps), config)
-    runner = TaskRunner(store, graph)
+        repo = ErpRepository(engine, faults)
+        store = TaskStore(engine)
+        skills = SkillRegistry()
+        # 默认不传固定脚本：让评测真正走一遍规则解析器，而不是复用预先给定的解析结果
+        factory = model_factory or offline_model_factory()
+        deps = CoordinatorDeps(
+            repo=repo,
+            store=store,
+            config=config,
+            agents_config=load_agents_config(),
+            skills=skills,
+            policy=PolicyEngine(config),
+            model_factory=factory,
+            memory=MemoryStore(engine, config),
+            summarizer=ContextSummarizer(config, factory),
+        )
+        graph = build_stage_graph(store, build_handlers(deps), config)
+        runner = TaskRunner(store, graph)
 
-    started = time.perf_counter()
-    task_id = runner.start(case.request_text)
-    record = store.get_task(task_id)
-    events = store.list_events(task_id)
-    approval_requested = any(event.event_type == "approval_requested" for event in events)
-    delegation_modes = [
-        event.payload.get("mode")
-        for event in events
-        if event.event_type == "delegation_result"
-    ]
-    if record.state is TaskState.AWAITING_APPROVAL and case.expect_state == "AWAITING_APPROVAL":
-        pass
-    duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        started = time.perf_counter()
+        task_id = runner.start(case.request_text)
+        record = store.get_task(task_id)
+        events = store.list_events(task_id)
+        approval_requested = any(
+            event.event_type == "approval_requested" for event in events
+        )
+        delegation_modes = [
+            event.payload.get("mode")
+            for event in events
+            if event.event_type == "delegation_result"
+        ]
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
 
-    return {
-        "case_id": case.id,
-        "task_id": task_id,
-        "expect_state": case.expect_state,
-        "actual_state": record.state.value,
-        "expect_approval": case.expect_approval,
-        "approval_requested": approval_requested,
-        "duration_ms": duration_ms,
-        "token_peak": int(record.token_usage.get("peak", 0)),
-        "token_total": int(record.token_usage.get("total", 0)),
-        "delegation_framework": sum(1 for mode in delegation_modes if mode == "framework"),
-        "delegation_fallback": sum(1 for mode in delegation_modes if mode == "fallback"),
-        "success": record.state.value == case.expect_state
-        and approval_requested == case.expect_approval,
-    }
+        return {
+            "case_id": case.id,
+            "task_id": task_id,
+            "expect_state": case.expect_state,
+            "actual_state": record.state.value,
+            "expect_approval": case.expect_approval,
+            "approval_requested": approval_requested,
+            "duration_ms": duration_ms,
+            "token_peak": int(record.token_usage.get("peak", 0)),
+            "token_total": int(record.token_usage.get("total", 0)),
+            "delegation_framework": sum(
+                1 for mode in delegation_modes if mode == "framework"
+            ),
+            "delegation_fallback": sum(
+                1 for mode in delegation_modes if mode == "fallback"
+            ),
+            "success": record.state.value == case.expect_state
+            and approval_requested == case.expect_approval,
+        }
+    finally:
+        engine.dispose()
 
 
 def run_eval(
@@ -268,12 +276,13 @@ class EvalRunner:
             report = run_eval(cases, self.workspace)
         except Exception as exc:  # noqa: BLE001
             report = EvalReport(status="failed", failures=[{"case_id": "-", "error": str(exc)}])
-        with self._lock:
-            self._report = report
+        # 先落盘再发布报告：否则轮询到 finished 的一瞬间文件可能还没写完
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.output_path.write_text(
             json.dumps(report.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        with self._lock:
+            self._report = report
 
     def start(self) -> None:
         with self._lock:

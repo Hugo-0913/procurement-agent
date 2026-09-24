@@ -28,6 +28,14 @@ def qualification_from_payload(data: dict) -> QualificationOutcome:
 
 
 def sourcing_to_payload(outcome: SourcingOutcome) -> dict:
+    """比价结果的跨阶段载荷。
+
+    这里必须是**显式全字段**：它是手写字典，漏字段不会报错，只会让字段在
+    `sourcing_from_payload` 重建时静默回落成默认值。历史上漏过 available_days /
+    deadline_feasible，后来又漏了 moq_violated / shelf_life_insufficient——
+    后两个一漏，起订量与效期这两条转人工规则在端到端流程里就再也不触发了。
+    `tests/test_payload_roundtrip.py` 用字段集合对齐把它钉住。
+    """
     return {
         "comparisons": [asdict(item) for item in outcome.comparisons],
         "recommended": asdict(outcome.recommended) if outcome.recommended else None,
@@ -35,6 +43,8 @@ def sourcing_to_payload(outcome: SourcingOutcome) -> dict:
         "insufficient_quotes": outcome.insufficient_quotes,
         "available_days": outcome.available_days,
         "deadline_feasible": outcome.deadline_feasible,
+        "moq_violated": outcome.moq_violated,
+        "shelf_life_insufficient": outcome.shelf_life_insufficient,
     }
 
 
@@ -47,6 +57,8 @@ def sourcing_from_payload(data: dict) -> SourcingOutcome:
         insufficient_quotes=bool(data.get("insufficient_quotes", False)),
         available_days=data.get("available_days"),
         deadline_feasible=bool(data.get("deadline_feasible", True)),
+        moq_violated=bool(data.get("moq_violated", False)),
+        shelf_life_insufficient=bool(data.get("shelf_life_insufficient", False)),
     )
 
 

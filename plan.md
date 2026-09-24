@@ -1,5 +1,10 @@
 # 医用耗材采购自动化 Agent 系统 实施计划
 
+> ⚠️ **历史文档（2026-09-24 标注）**：这是项目启动时的施工计划，其中的演示数据、任务分解与部分实现方式
+> 已经过时（业务域换过两次、数据从 1 种物料扩到 5 种、子 Agent 改为框架真实委派等）。
+> **现状请以 [PRD.md](PRD.md)、[docs/decision-log.md](docs/decision-log.md)、[docs/handoff.md](docs/handoff.md) 为准**，
+> 本文件仅保留作过程留痕。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 构建一个可演示、可评测的医用耗材采购自动化 Agent 系统，用主 Agent 委派三类子 Agent 完成「需求输入 → 资质核验 → 比价分析 → 订单生成」闭环，并提供本地 Web 界面实时观察委派过程、审批拦截与异常重试。

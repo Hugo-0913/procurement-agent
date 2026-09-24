@@ -34,3 +34,33 @@ def test_timeline_rerender_does_not_touch_action_cards():
     render_body = source[source.index("function renderTimeline"):]
     assert "action-cards" not in render_body, "时间线重绘不应涉及待办卡片容器"
 
+
+def test_timeline_defaults_to_key_events_only():
+    """时间线默认只显示关键事件，工具调用/技能加载/记忆读写默认折叠。
+
+    页面要服务业务人员："发生了什么"必须一眼看到，"怎么做到的"按需展开。
+    """
+    html = TPL.read_text(encoding="utf-8")
+    assert 'id="tl-key"' in html and 'id="tl-all"' in html
+    assert 'class="seg-btn active" type="button">关键事件' in html, "默认视图应是关键事件"
+
+    source = (STATIC / "timeline.js").read_text(encoding="utf-8")
+    assert 'let timelineScope = "key"' in source, "时间线默认作用域必须是关键事件"
+    key_block = source[source.index("KEY_EVENT_TYPES = new Set(["):]
+    key_block = key_block[: key_block.index("])")]
+    for event_type in ("stage_change", "agent_delegation", "approval_decided", "retry", "error"):
+        assert event_type in key_block, f"{event_type} 属于关键事件，不应被默认折叠"
+    for event_type in ("tool_call", "tool_result", "skill_loaded", "memory_written"):
+        assert event_type not in key_block, f"{event_type} 是工程细节，应默认折叠"
+
+
+def test_memory_and_skill_details_are_folded_by_default():
+    """记忆全文与技能状态收进 <details>：默认收起，避免抢占业务信息的位置。"""
+    html = TPL.read_text(encoding="utf-8")
+    assert 'id="memory-summary"' in html
+    for target in ('id="memory-block"', 'id="skill-status"'):
+        at = html.index(target)
+        details_at = html.rindex("<details", 0, at)
+        assert "</details>" not in html[details_at:at], f"{target} 必须包在折叠区里"
+        open_tag = html[details_at : html.index(">", details_at)]
+        assert "open" not in open_tag, f"{target} 所在的折叠区不应默认展开"

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import logging
 import os
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +11,6 @@ from fastapi.templating import Jinja2Templates
 from procurement_agent.agents.config import load_agents_config
 from procurement_agent.agents.coordinator import CoordinatorDeps, build_handlers
 from procurement_agent.agents.model import build_chat_model
-from procurement_agent.agents.offline import offline_model_factory
 from procurement_agent.config import load_env, load_procurement_config
 from procurement_agent.db.models import init_db, seed_demo_data
 from procurement_agent.erp.faults import FaultRegistry
@@ -29,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 # 静态资源版本号：改动前端文件后必须更新它。
 # 浏览器会缓存 /static/*.js，若 HTML 与 JS 版本不匹配，页面按钮会"点了没反应"。
-ASSET_VERSION = "20260923-3"
+# 改了前端静态资源就把它 +1：浏览器缓存不清会继续跑旧 JS（表现为"点了没反应"）
+ASSET_VERSION = "20260923-5"
 
 
 def default_db_path() -> Path:

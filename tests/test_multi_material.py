@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from procurement_agent.agents.config import load_agents_config
 from procurement_agent.agents.coordinator import CoordinatorDeps, build_handlers
 from procurement_agent.agents.ordering import OrderDraft
@@ -45,12 +43,17 @@ def make_env(tmp_path):
     return repo, engine
 
 
-def test_seed_has_two_materials(tmp_path):
+def test_seed_has_five_materials(tmp_path):
     repo, _ = make_env(tmp_path)
     assert repo.find_material_by_name("一次性无菌注射器") is not None
     assert repo.find_material_by_name("医用外科口罩") is not None
-    stapler = repo.find_material_by_name("医用外科口罩")
-    assert len(repo.list_quotes(stapler.id)) == 3
+    mask = repo.find_material_by_name("医用外科口罩")
+    # 4 家可用供应商 + 1 家黑名单（黑名单也有报价，演示"报价最低也不可用"）
+    assert len(repo.list_quotes(mask.id)) == 5
+    for name in ("一次性使用输液器", "医用丁腈检查手套", "无菌纱布块"):
+        material = repo.find_material_by_name(name)
+        assert material is not None, f"{name} 未进主数据"
+        assert len(repo.list_quotes(material.id)) == 5
 
 
 def test_sourcing_payload_roundtrip_for_multiple_items(tmp_path):

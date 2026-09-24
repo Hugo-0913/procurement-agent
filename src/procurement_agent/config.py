@@ -28,6 +28,10 @@ class ProcurementConfig:
     #   approval —— 以唯一报价继续，但必须转人工审批（默认，业务更合理）
     #   fail     —— 直接判定任务失败
     single_quote_policy: str = "approval"
+    # 采购偏好：综合成本接近时优先的供应商等级与"接近"的容忍区间。
+    # 偏好只在成本差异不超过容忍比例时生效，避免偏好压过价格。
+    prefer_tier: str = "A"
+    tier_preference_tolerance: float = 0.02
 
 
 def load_env(path: Path | None = None) -> bool:
@@ -50,6 +54,15 @@ def load_procurement_config(path: Path | None = None) -> ProcurementConfig:
     policy = str(raw.get("single_quote_policy", "approval"))
     if policy not in {"approval", "fail"}:
         raise ValueError("single_quote_policy 只能是 approval 或 fail")
+    prefer_tier = str(raw.get("prefer_tier", "A")).upper()
+    if prefer_tier not in {"A", "B", "C"}:
+        raise ValueError("prefer_tier 只能是 A / B / C")
+    tolerance = float(raw.get("tier_preference_tolerance", 0.02))
+    if tolerance < 0:
+        raise ValueError("tier_preference_tolerance 不能为负数")
     return ProcurementConfig(
-        **{field: raw[field] for field in REQUIRED_FIELDS}, single_quote_policy=policy
+        **{field: raw[field] for field in REQUIRED_FIELDS},
+        single_quote_policy=policy,
+        prefer_tier=prefer_tier,
+        tier_preference_tolerance=tolerance,
     )

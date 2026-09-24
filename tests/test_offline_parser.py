@@ -33,6 +33,30 @@ def test_vague_request_has_no_quantity():
     assert result["material_name"] == "一次性无菌注射器"
 
 
+def test_parses_multiple_materials_into_items():
+    """一条需求里出现两种物料时，解析结果要给 items 数组（离线模式也要能演示多物料）。"""
+    result = parse_request_text("采购 2000 箱注射器 + 1000 盒口罩，成本中心 CC-1001")
+    assert result["items"] == [
+        {"material_name": "一次性无菌注射器", "quantity": 2000, "unit": "箱"},
+        {"material_name": "医用外科口罩", "quantity": 1000, "unit": "盒"},
+    ]
+    assert result["cost_center"] == "CC-1001"
+
+
+def test_single_material_keeps_legacy_shape():
+    """单物料仍走原来的字段形态，保证既有用例与老行为不变。"""
+    result = parse_request_text("采购 50 箱 一次性无菌注射器，成本中心 CC-1001")
+    assert result["items"] is None
+    assert result["material_name"] == "一次性无菌注射器"
+    assert result["quantity"] == 50
+
+
+def test_repeated_same_material_is_not_split_into_items():
+    """同一物料写了两遍属于表述重复，不能猜成两行订单。"""
+    result = parse_request_text("采购 50 箱注射器，再补 20 箱注射器")
+    assert result["items"] is None
+
+
 def test_model_returns_json_for_parse_prompt():
     model = OfflineModel(default_response=None)
     prompt = "字段要求：material_name\n采购需求：采购 3000 箱 一次性无菌注射器"

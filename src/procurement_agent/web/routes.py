@@ -172,6 +172,18 @@ def build_task_detail(ctx: WebContext, task_id: str) -> dict[str, Any]:
         order_lines = draft_event.get("drafts") or (
             [draft_event["draft"]] if draft_event.get("draft") else []
         )
+        # 订单行只带 material_id：审批人必须能看出"这一行买的是什么"，
+        # 否则多物料订单的审批卡片上是几行没有名字的报价，无法核单。
+        material_names = {m.id: m.name for m in ctx.repo.list_materials()}
+        order_lines = [
+            {
+                **line,
+                "material_name": material_names.get(
+                    line.get("material_id"), str(line.get("material_id"))
+                ),
+            }
+            for line in order_lines
+        ]
         pending = {
             "matched_rules": requested.get("matched_rules", []),
             "order_draft": order_lines[0] if order_lines else None,
@@ -320,18 +332,11 @@ def build_router(ctx: WebContext) -> APIRouter:
         record = ctx.store.get_task(task_id)
         if record.state is not TaskState.AWAITING_APPROVAL:
             raise HTTPException(status_code=409, detail="任务当前不在等待审批状态")
-        ctx.store.append_event(
-            task_id,
-            agent=payload.operator,
-            event_type="approval_decided",
-            payload={
-                "operator": payload.operator,
-                "reason": payload.reason,
-                "decision": payload.decision,
-                "source": "web",
-            },
+        # 审批决策事件由状态机统一写（唯一来源），这里只负责把决策交给流程续跑。
+        # 早期两处各写一条，时间线上会出现两行一模一样的"审批通过"。
+        ctx.runner.resume(
+            task_id, payload.decision, payload.operator, payload.reason, source="web"
         )
-        ctx.runner.resume(task_id, payload.decision, payload.operator, payload.reason)
         return build_task_detail(ctx, task_id)
 
     @router.post("/api/tasks/{task_id}/clarification")
@@ -427,7 +432,9 @@ def build_router(ctx: WebContext) -> APIRouter:
     @router.get("/api/orders")
     def orders() -> list[dict[str, Any]]:
         suppliers = {s.id: s for s in ctx.repo.list_suppliers()}
-        materials = {m.id: m for m in [ctx.repo.find_material_by_name("一次性无菌注射器")] if m}
+        # 物料名必须覆盖全部主数据：早期这里只放了"一次性无菌注射器"一条，
+        # 多物料订单里第二种物料会退化成打印物料 ID（页面上显示成"2"）。
+        materials = {m.id: m for m in ctx.repo.list_materials()}
         return [
             {
                 "id": order.id,

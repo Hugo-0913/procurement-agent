@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import Any, Callable, TypedDict
 
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -92,9 +91,16 @@ def build_stage_graph(
         )
         store.append_event(
             task_id,
-            agent="human",
+            # 用操作人做 agent，时间线上能直接看出是谁批的；
+            # 这条事件是审批决策的唯一来源（接口层不再重复写一条）。
+            agent=str(payload.get("operator") or "human"),
             event_type="approval_decided",
-            payload=payload,
+            payload={
+                "decision": str(payload.get("decision", "")),
+                "operator": str(payload.get("operator", "")),
+                "reason": str(payload.get("reason", "")),
+                "source": str(payload.get("source", "api")),
+            },
         )
         return {"approval": payload}
 
@@ -217,10 +223,24 @@ class TaskRunner:
         )
         self.run(task_id, merged)
 
-    def resume(self, task_id: str, decision: str, operator: str, reason: str = "") -> None:
+    def resume(
+        self,
+        task_id: str,
+        decision: str,
+        operator: str,
+        reason: str = "",
+        source: str = "api",
+    ) -> None:
         try:
             self.graph.invoke(
-                Command(resume={"decision": decision, "operator": operator, "reason": reason}),
+                Command(
+                    resume={
+                        "decision": decision,
+                        "operator": operator,
+                        "reason": reason,
+                        "source": source,
+                    }
+                ),
                 self._config(task_id),
             )
         except Exception as exc:  # noqa: BLE001

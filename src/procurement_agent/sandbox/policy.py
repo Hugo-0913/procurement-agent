@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, Sequence
+from typing import Protocol, Sequence
 
 from procurement_agent.config import ProcurementConfig
 

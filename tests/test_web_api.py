@@ -1,6 +1,5 @@
-import pytest
 
-from tests.conftest import make_offline_app, make_client, wait_for_state
+from tests.conftest import make_client, wait_for_state
 
 
 async def test_create_task_returns_id(offline_app):
@@ -68,6 +67,25 @@ async def test_orders_endpoint_reflects_created_order(offline_app):
         assert orders[0]["total_amount"] > 0
 
 
+async def test_orders_endpoint_shows_every_material_name(tmp_path):
+    """物料名要覆盖全部主数据：非注射器的订单也必须显示物料名，不能退化成物料 ID。
+
+    刻意不用 ``offline_app`` 那个 fixture：它注入的固定回复把物料写死成注射器，
+    会掩盖"非注射器物料退化成 ID"这类问题。这里走规则解析器，让订单真的落到第二种物料。
+    """
+    from procurement_agent.web.app import create_app
+
+    app = create_app(tmp_path / "web.db", offline=True)
+    async with await make_client(app) as client:
+        created = await client.post(
+            "/api/tasks", json={"request_text": "采购 50 盒 医用外科口罩"}
+        )
+        task_id = created.json()["task_id"]
+        await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
+        orders = (await client.get("/api/orders")).json()
+        assert [order["material_name"] for order in orders] == ["医用外科口罩"]
+
+
 async def test_fault_toggle_persists(offline_app):
     async with await make_client(offline_app) as client:
         before = (await client.get("/api/faults")).json()
@@ -84,17 +102,29 @@ async def test_fault_toggle_persists(offline_app):
 async def test_suppliers_and_quotes_endpoints(offline_app):
     async with await make_client(offline_app) as client:
         suppliers = (await client.get("/api/suppliers")).json()
-        assert len(suppliers) == 4
+        assert len(suppliers) == 5
         quotes = (await client.get("/api/quotes")).json()
         # 不传 material_id 时返回全部物料的报价，便于横向比价
-        assert len(quotes) == 6
-        assert {q["material_name"] for q in quotes} == {"一次性无菌注射器", "医用外科口罩"}
+        assert len(quotes) == 25  # 5 种物料 × 5 家供应商
+        assert {q["material_name"] for q in quotes} == {
+            "一次性无菌注射器",
+            "一次性使用输液器",
+            "医用外科口罩",
+            "医用丁腈检查手套",
+            "无菌纱布块",
+        }
 
 
 async def test_materials_and_cost_centers_endpoints(offline_app):
     async with await make_client(offline_app) as client:
         materials = (await client.get("/api/materials")).json()
-        assert [m["name"] for m in materials] == ["一次性无菌注射器", "医用外科口罩"]
+        assert [m["name"] for m in materials] == [
+            "一次性无菌注射器",
+            "一次性使用输液器",
+            "医用外科口罩",
+            "医用丁腈检查手套",
+            "无菌纱布块",
+        ]
         assert all(m["unit"] for m in materials)
         centers = (await client.get("/api/cost-centers")).json()
         assert any(c["code"] == "CC-1001" for c in centers)

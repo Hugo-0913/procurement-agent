@@ -4,3 +4,6 @@ context_token_threshold: 12000
 min_quote_count: 2
 freshness_warn_days: 30
 single_quote_policy: approval
+# 采购偏好：综合成本接近（差异不超过 2%）时优先 A 类供应商
+prefer_tier: A
+tier_preference_tolerance: 0.02

@@ -6,7 +6,6 @@
 """
 
 from procurement_agent.state.models import TaskState
-
 from tests.test_coordinator import build_runner, parse_response
 
 

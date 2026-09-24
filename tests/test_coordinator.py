@@ -261,3 +261,28 @@ def test_invalid_json_from_model_marks_task_failed(tmp_path):
     retries = [e for e in store.list_events(task_id) if e.event_type == "retry"]
     assert len(retries) == CONFIG.retry_max_attempts - 1
     assert all(e.payload["reason"] == "JSONDecodeError" for e in retries)
+
+
+def test_approval_interception_is_recorded_as_policy_denied(tmp_path):
+    """命中审批规则时，策略护栏要落一条 policy_denied：拦截必须可观测。"""
+    _, store, _, runner = build_runner(tmp_path, [parse_response(quantity=3000)])
+    task_id = runner.start(DEFAULT_REQUEST)
+    assert store.get_task(task_id).state is TaskState.AWAITING_APPROVAL
+
+    denied = [e for e in store.list_events(task_id) if e.event_type == "policy_denied"]
+    assert len(denied) == 1, "审批拦截应恰好产生一条策略拦截事件"
+    payload = denied[0].payload
+    assert payload["tool"] == "order_draft"
+    assert payload["requires_approval"] is True
+    assert payload["rules"] and "阈值" in payload["rules"][0]
+    assert payload["reason"]
+
+
+def test_normal_run_has_no_policy_denied(tmp_path):
+    """正常放行的任务不应该有策略拦截事件，否则这个信号会变成噪声。"""
+    _, store, _, runner = build_runner(tmp_path, [parse_response()])
+    task_id = runner.start(DEFAULT_REQUEST)
+    assert store.get_task(task_id).state is TaskState.COMPLETED
+    assert not [
+        e for e in store.list_events(task_id) if e.event_type == "policy_denied"
+    ]

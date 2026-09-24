@@ -5,9 +5,9 @@ from procurement_agent.agents.sourcing import run_sourcing
 
 
 def test_scope_must_cover_material_category(env):
-    """口罩属于医用防护用品；济生只登记了注射穿刺器械，应因超范围经营被淘汰。"""
-    mask = env.repo.find_material_by_name("医用外科口罩")
-    outcome = run_qualification(env.repo, env.config, mask.id)
+    """纱布块属于医用敷料；济生的经营范围没登记敷料，应因超范围经营被淘汰。"""
+    gauze = env.repo.find_material_by_name("无菌纱布块")
+    outcome = run_qualification(env.repo, env.config, gauze.id)
     codes = {s.code for s in outcome.qualified}
     assert "SUP-C" not in codes
     reason = {r.code: r.reason for r in outcome.rejected}["SUP-C"]
@@ -15,10 +15,10 @@ def test_scope_must_cover_material_category(env):
 
 
 def test_scope_covers_syringe_category(env):
-    """注射器属于注射穿刺器械，三家的经营范围都覆盖。"""
+    """注射器属于注射穿刺器械，四家可用供应商的经营范围都覆盖。"""
     syringe = env.repo.find_material_by_name("一次性无菌注射器")
     outcome = run_qualification(env.repo, env.config, syringe.id)
-    assert {"SUP-A", "SUP-B", "SUP-C"} <= {s.code for s in outcome.qualified}
+    assert {"SUP-A", "SUP-B", "SUP-C", "SUP-E"} <= {s.code for s in outcome.qualified}
 
 
 def test_registration_is_checked_per_material(env, tmp_path):
@@ -69,4 +69,3 @@ def test_min_order_quantity_satisfied(env):
     outcome = run_sourcing(env.repo, env.config, mask.id, 300, qualified)
     assert outcome.moq_violated is False
     assert outcome.recommended.meets_moq is True
-

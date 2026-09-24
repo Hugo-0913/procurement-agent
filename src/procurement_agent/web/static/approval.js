@@ -17,6 +17,7 @@ function renderApproval(detail, onDone) {
   const lineRows = lines
     .map(
       (line) => `<tr>
+        <td>${line.material_name || "-"}</td>
         <td>${line.supplier_name || "-"}</td>
         <td>${line.quantity ?? "-"}</td>
         <td>¥${(line.unit_price ?? 0).toFixed(2)}</td>
@@ -31,9 +32,9 @@ function renderApproval(detail, onDone) {
     <div class="card-head"><span class="badge orange">需要人工审批</span></div>
     ${rules}
     <table class="data" style="margin-top:10px">
-      <tr><th>供应商</th><th>数量</th><th>单价</th><th>小计</th><th>交期</th></tr>
+      <tr><th>物料</th><th>供应商</th><th>数量</th><th>单价</th><th>小计</th><th>交期</th></tr>
       ${lineRows}
-      <tr><td colspan="3"><strong>合计（${lines.length} 行）</strong></td>
+      <tr><td colspan="4"><strong>合计（${lines.length} 行）</strong></td>
           <td colspan="2"><strong>¥${Number(total).toFixed(2)}</strong></td></tr>
     </table>
     <div class="hint" style="margin-top:6px">成本中心：${draft.cost_center || "-"}</div>

@@ -54,10 +54,10 @@ def _print_signature() -> None:
 
 def _build_structural_agent():
     """用占位 key 构造 Agent，验证 API 兼容性与中间件装配（不发起网络请求）。"""
-    from langchain_deepseek import ChatDeepSeek
-    from langgraph.checkpoint.sqlite import SqliteSaver
     from deepagents import create_deep_agent
     from deepagents.middleware.filesystem import FilesystemPermission
+    from langchain_deepseek import ChatDeepSeek
+    from langgraph.checkpoint.sqlite import SqliteSaver
 
     model = ChatDeepSeek(
         model="deepseek-chat",
@@ -125,8 +125,8 @@ def _report_structure(agent) -> None:
 
 
 def _live_delegation_check() -> None:
-    from langchain_deepseek import ChatDeepSeek
     from deepagents import create_deep_agent
+    from langchain_deepseek import ChatDeepSeek
 
     model = ChatDeepSeek(
         model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),

@@ -28,11 +28,11 @@ def test_expiring_soon_marked_not_rejected(env):
 def test_healthy_suppliers_all_qualified(env):
     outcome = run_qualification(env.repo, env.config, env.material.id)
     codes = {s.code for s in outcome.qualified}
-    assert {"SUP-A", "SUP-B", "SUP-C"} <= codes
+    assert {"SUP-A", "SUP-B", "SUP-C", "SUP-E"} <= codes
+    assert len(codes) == 4, "可用供应商应为 4 家（第 5 家是黑名单）"
 
 
 def test_skill_loaded_when_registry_passed(env):
     registry = SkillRegistry()
     run_qualification(env.repo, env.config, env.material.id, skills=registry)
     assert registry.loaded_names == {"supplier_qualification"}
-

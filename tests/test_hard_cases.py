@@ -15,8 +15,8 @@ def hard_report(tmp_path_factory):
 
 def test_hard_case_set_loads(hard_report):
     cases, _ = hard_report
-    assert len(cases) == 10
-    assert len({case.id for case in cases}) == 10
+    assert len(cases) == 13
+    assert len({case.id for case in cases}) == 13
 
 
 def test_vague_and_unknown_material_ask_for_clarification(hard_report):
@@ -53,6 +53,21 @@ def test_single_viable_supplier_escalates_instead_of_failing(hard_report):
     failed = {item["case_id"] for item in report.failures}
     assert "H-10" not in failed, "唯一可用报价场景未按审批策略处理"
     assert report.intervention_count >= 2
+
+
+def test_out_of_scope_material_still_orders(hard_report):
+    """纱布块不在济生的经营范围内：它报价最低也必须被淘汰，任务照常完成。"""
+    _, report = hard_report
+    failed = {item["case_id"] for item in report.failures}
+    assert "H-11" not in failed, "超经营范围的最低报价未被正确排除"
+
+
+def test_multi_material_cases_run_in_offline_mode(hard_report):
+    """多物料要走通解析→逐项比价→逐行下单，离线模式也必须覆盖到。"""
+    _, report = hard_report
+    failed = {item["case_id"] for item in report.failures}
+    assert "H-12" not in failed, "多物料正常路径离线跑不通"
+    assert "H-13" not in failed, "多物料按合计金额触发审批的行为不符"
 
 
 def test_urgent_deadline_escalates_for_lead_time_reason(tmp_path_factory):

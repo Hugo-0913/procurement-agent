@@ -17,9 +17,16 @@
     <div class="panel-head"><h3>结构化要素</h3></div>
     <table id="structured" class="kv"></table>
     <div class="panel-head"><h3>已加载记忆</h3></div>
-    <pre id="memory-block" class="small pre"></pre>
-    <div class="panel-head"><h3>技能状态</h3></div>
-    <div id="skill-status" class="tags"></div>
+    <p id="memory-summary" class="small"></p>
+    <!-- 记忆全文与技能状态属于工程细节：默认折叠，需要时展开，避免抢占业务信息的位置 -->
+    <details class="fold">
+      <summary>展开完整记忆</summary>
+      <pre id="memory-block" class="small pre"></pre>
+    </details>
+    <details class="fold">
+      <summary>工程细节 · 技能加载状态</summary>
+      <div id="skill-status" class="tags"></div>
+    </details>
   </aside>
 
   <section class="panel">
@@ -32,6 +39,10 @@
     <div class="panel-head">
       <h3>执行时间线</h3>
       <div class="row">
+        <span class="seg">
+          <button id="tl-key" class="seg-btn active" type="button">关键事件</button>
+          <button id="tl-all" class="seg-btn" type="button">全部事件</button>
+        </span>
         <select id="filter-agent" class="mini"><option value="">全部 Agent</option></select>
         <select id="filter-type" class="mini"><option value="">全部事件</option></select>
       </div>
@@ -39,6 +50,7 @@
     <!-- 待办卡片放在时间线之外：时间线每 5 秒整体重绘，放里面会把用户正在输入的内容一起抹掉 -->
     <div id="action-cards"></div>
     <div id="timeline" class="timeline"></div>
+    <p id="timeline-note" class="hint"></p>
   </aside>
 </div>
 {% endblock %}

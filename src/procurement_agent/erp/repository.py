@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, timedelta
-import re
 from typing import Any, Mapping
 
 from sqlalchemy import func, select
@@ -21,11 +21,17 @@ from procurement_agent.erp.faults import (
     ALL_QUOTES_OVER_BUDGET,
     SUPPLIER_B_EXPIRED,
     SUPPLIER_C_NO_QUOTE,
+    SUPPLIER_E_NO_QUOTE,
     FaultRegistry,
 )
 
 EXPIRED_SUPPLIER_CODES = {"SUP-B"}
-NO_QUOTE_SUPPLIER_CODES = {"SUP-C"}
+# 停报开关 → 被停报的供应商编码。新增供应商时在这里挂一个开关，
+# 评测用例（如"只剩一家可用"）才能按需把可用报价压到唯一一条。
+NO_QUOTE_FLAGS: dict[str, set[str]] = {
+    SUPPLIER_C_NO_QUOTE: {"SUP-C"},
+    SUPPLIER_E_NO_QUOTE: {"SUP-E"},
+}
 
 
 def _normalize_name(text: Any) -> str:
@@ -141,11 +147,15 @@ class ErpRepository:
                     .order_by(Quote.unit_price)
                 )
             )
-            if self._flag(SUPPLIER_C_NO_QUOTE):
+            blocked_codes: set[str] = set()
+            for flag, codes in NO_QUOTE_FLAGS.items():
+                if self._flag(flag):
+                    blocked_codes |= codes
+            if blocked_codes:
                 blocked = {
                     sid
                     for (sid,) in session.execute(
-                        select(Supplier.id).where(Supplier.code.in_(NO_QUOTE_SUPPLIER_CODES))
+                        select(Supplier.id).where(Supplier.code.in_(blocked_codes))
                     )
                 }
                 rows = [row for row in rows if row.supplier_id not in blocked]

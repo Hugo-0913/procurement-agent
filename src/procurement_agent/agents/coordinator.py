@@ -5,28 +5,22 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from procurement_agent.agents.config import AgentsConfig
+from procurement_agent.agents.dates import is_iso_date, parse_relative_date
 from procurement_agent.agents.delegation import (
-    ORDERING_AGENT,
-    QUALIFICATION_AGENT,
-    SOURCING_AGENT,
     DelegationRuntime,
     TaskContext,
 )
-from procurement_agent.agents.dates import is_iso_date, parse_relative_date
 from procurement_agent.agents.model import build_chat_model
 from procurement_agent.agents.ordering import InsufficientQuotesError
 from procurement_agent.agents.payloads import (
     draft_to_payload,
     payload_to_draft,
-    qualification_from_payload,
-    qualification_to_payload,
-    sourcing_from_payload,
     sourcing_items_to_payload,
-    sourcing_to_payload,
 )
 from procurement_agent.agents.response import response_text
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.erp.repository import ErpRepository
+from procurement_agent.middleware.policy_guard import PolicyGuard
 from procurement_agent.middleware.reflection_retry import RetryExhausted, run_with_retry
 from procurement_agent.middleware.token_usage import TokenUsageCallback
 from procurement_agent.sandbox.policy import PolicyEngine
@@ -418,6 +412,18 @@ def build_handlers(deps: CoordinatorDeps):
         )
         drafts = task_context.results["drafts"]
         decision = task_context.results["decision"]
+        # 策略护栏：被拦截的工具调用必须可观测——命中审批规则时落一条 policy_denied，
+        # 携带工具名与规则原文，页面时间线里能查到"为什么停在这里"。
+        # 放行与否最终由状态机决定（命中规则则转 AWAITING_APPROVAL），这里只做留痕。
+        PolicyGuard(deps.store).guard_tool_call(
+            task_id,
+            "order_draft",
+            {
+                "lines": len(drafts),
+                "total": round(sum(item.total_amount for item in drafts), 2),
+            },
+            decision,
+        )
         result = StageResult(
             state=TaskState.ORDER_DRAFTING,
             payload={

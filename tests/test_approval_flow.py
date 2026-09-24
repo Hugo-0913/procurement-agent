@@ -17,6 +17,11 @@ async def test_large_order_awaits_approval_with_rules(big_order_app):
         assert draft["lead_days"] > 0
         assert draft["cost_center"] == "CC-1001"
         assert pending["recommendation_reason"]
+        # 审批卡片要能看出每一行买的是什么物料，否则多物料订单无法核单
+        assert all(line["material_name"] for line in pending["order_lines"])
+        assert {line["material_name"] for line in pending["order_lines"]} == {
+            "一次性无菌注射器"
+        }
 
 
 async def test_approve_writes_order(big_order_app):
@@ -33,6 +38,15 @@ async def test_approve_writes_order(big_order_app):
         detailed = await wait_for_state(client, task_id, {"COMPLETED", "FAILED"})
         assert detailed["state"] == "COMPLETED"
         assert detailed["order_id"] is not None
+        # 决策事件只能有一条：曾经接口层和状态机各写一条，时间线上是两行重复内容
+        decided = [
+            event
+            for event in detailed["events"]
+            if event["event_type"] == "approval_decided"
+        ]
+        assert len(decided) == 1
+        assert decided[0]["payload"]["source"] == "web"
+        assert decided[0]["payload"]["operator"] == "李经理"
         orders = (await client.get("/api/orders")).json()
         assert any(order["task_id"] == task_id for order in orders)
 

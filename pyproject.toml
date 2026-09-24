@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "httpx"]
+dev = ["pytest", "pytest-asyncio", "httpx", "ruff"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -31,3 +31,12 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "data", "eval_results", "workspace"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+# 行长由格式化工具管，不参与 lint（中文字符宽度让 E501 误报偏多）
+ignore = ["E501"]

@@ -5,6 +5,8 @@
 这里对每个领域对象的往返做断言，防止同类问题再次发生。
 """
 
+from dataclasses import fields
+
 from procurement_agent.agents.payloads import (
     qualification_from_payload,
     qualification_to_payload,
@@ -50,6 +52,32 @@ def test_sourcing_roundtrip_keeps_deadline_fields():
     assert restored.available_days == 1
     assert restored.deadline_feasible is False
     assert restored.comparisons[0].on_time is False
+    assert restored.insufficient_quotes is True
+
+
+def test_sourcing_payload_covers_every_field():
+    """载荷字段集合必须与 SourcingOutcome 的字段完全一致。
+
+    漏字段不会报错，只会让该字段在重建时静默回落成默认值：moq_violated 与
+    shelf_life_insufficient 就这样漏过一次，导致两条转人工规则端到端从未触发。
+    """
+    outcome = SourcingOutcome(
+        comparisons=[make_comparison()],
+        recommended=make_comparison(),
+        reason="测试用",
+        insufficient_quotes=True,
+        available_days=3,
+        deadline_feasible=False,
+        moq_violated=True,
+        shelf_life_insufficient=True,
+    )
+    payload = sourcing_to_payload(outcome)
+    assert set(payload) == {field.name for field in fields(SourcingOutcome)}
+
+    restored = sourcing_from_payload(payload)
+    assert restored.moq_violated is True
+    assert restored.shelf_life_insufficient is True
+    assert restored.deadline_feasible is False
     assert restored.insufficient_quotes is True
 
 

@@ -1,5 +1,25 @@
 const MIDDLEWARE_AGENTS = new Set(["context_summarizer", "policy_engine", "policy_guard"]);
 
+// 默认只看关键事件：阶段推进、委派与降级、审批与澄清、重试与错误、任务结束。
+// 工具调用/返回、技能加载、记忆读写这些工程细节默认隐藏——它们是"怎么做到的"，
+// 不是"发生了什么"，需要时用右上角的「全部事件」展开。
+const KEY_EVENT_TYPES = new Set([
+  "stage_change",
+  "agent_delegation",
+  "delegation_result",
+  "approval_requested",
+  "approval_decided",
+  "clarification_requested",
+  "clarification_answered",
+  "policy_denied",
+  "retry",
+  "error",
+  "task_finished",
+]);
+
+let timelineScope = "key";
+let latestEvents = [];
+
 const TIMELINE_TONE = {
   stage_change: "ok",
   task_finished: "ok",
@@ -17,12 +37,26 @@ const TIMELINE_TONE = {
 
 function renderTimeline(events) {
   const root = document.getElementById("timeline");
+  latestEvents = events;
   const agentFilter = document.getElementById("filter-agent").value;
   const typeFilter = document.getElementById("filter-type").value;
 
-  const rows = events.filter(
-    (e) => (!agentFilter || e.agent === agentFilter) && (!typeFilter || e.event_type === typeFilter)
+  const inScope = events.filter(
+    (e) => timelineScope === "all" || KEY_EVENT_TYPES.has(e.event_type)
   );
+  const hidden = events.length - inScope.length;
+  const rows = inScope.filter(
+    (e) =>
+      (!agentFilter || e.agent === agentFilter) &&
+      (!typeFilter || e.event_type === typeFilter)
+  );
+  const note = document.getElementById("timeline-note");
+  if (note) {
+    note.textContent =
+      timelineScope === "key" && hidden > 0
+        ? `已折叠 ${hidden} 条工程细节事件（工具调用、技能加载、记忆读写），切到「全部事件」可查看`
+        : "";
+  }
   root.innerHTML = rows
     .map((e) => {
       const time = (e.created_at || "").split("T")[1] || "";
@@ -48,6 +82,24 @@ function renderTimeline(events) {
     };
   });
 }
+
+function setTimelineScope(scope) {
+  timelineScope = scope === "all" ? "all" : "key";
+  const keyBtn = document.getElementById("tl-key");
+  const allBtn = document.getElementById("tl-all");
+  if (keyBtn) keyBtn.classList.toggle("active", timelineScope === "key");
+  if (allBtn) allBtn.classList.toggle("active", timelineScope === "all");
+  renderTimeline(latestEvents);
+}
+
+function bindTimelineScope() {
+  const keyBtn = document.getElementById("tl-key");
+  const allBtn = document.getElementById("tl-all");
+  if (keyBtn) keyBtn.onclick = () => setTimelineScope("key");
+  if (allBtn) allBtn.onclick = () => setTimelineScope("all");
+}
+
+bindTimelineScope();
 
 function highlightTimeline(seq) {
   document.querySelectorAll(".tl-item.highlight").forEach((el) => el.classList.remove("highlight"));

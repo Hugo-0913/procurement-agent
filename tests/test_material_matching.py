@@ -34,9 +34,26 @@ def test_sku_matches(tmp_path):
 
 
 def test_different_spec_does_not_match(tmp_path):
+    """没进货的品类不应被猜成已有物料（输液器曾是这个用例的例子，现在是正式物料了）。"""
     repo = make_repo(tmp_path)
-    assert repo.find_material_by_name("输液器") is None
     assert repo.find_material_by_name("呼吸机") is None
+    assert repo.find_material_by_name("留置针") is None
+
+
+def test_new_materials_match_by_name_and_alias(tmp_path):
+    """新增物料要能被名称与别名命中，否则离线模式下会一直要求澄清。"""
+    repo = make_repo(tmp_path)
+    for text, sku in (
+        ("一次性使用输液器", "ST-INF-SET"),
+        ("输液器", "ST-INF-SET"),
+        ("医用丁腈检查手套", "ST-GLOVE-N"),
+        ("丁腈手套", "ST-GLOVE-N"),
+        ("无菌纱布块", "ST-GAUZE-10"),
+        ("纱布", "ST-GAUZE-10"),
+    ):
+        material = repo.find_material_by_name(text)
+        assert material is not None, f"未命中: {text}"
+        assert material.sku == sku
 
 
 def test_blank_input_returns_none(tmp_path):

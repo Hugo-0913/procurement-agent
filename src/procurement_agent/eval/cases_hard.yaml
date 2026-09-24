@@ -61,5 +61,24 @@
   faults:
     supplier_b_expired: true
     supplier_c_no_quote: true
+    supplier_e_no_quote: true
+  expect_state: AWAITING_APPROVAL
+  expect_approval: true
+- id: H-11
+  request_text: 采购 300 包无菌纱布块，成本中心 CC-1002
+  quantity: 300
+  faults: {}
+  expect_state: COMPLETED
+  expect_approval: false
+- id: H-12
+  request_text: 采购 50 箱 一次性无菌注射器和 200 盒医用外科口罩，成本中心 CC-1001
+  quantity: 50
+  faults: {}
+  expect_state: COMPLETED
+  expect_approval: false
+- id: H-13
+  request_text: 采购 2000 箱 一次性无菌注射器和 1000 盒医用外科口罩，成本中心 CC-1001
+  quantity: 2000
+  faults: {}
   expect_state: AWAITING_APPROVAL
   expect_approval: true

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
-import pytest
 import httpx
+import pytest
 
 from procurement_agent.config import ProcurementConfig
 from procurement_agent.db.models import init_db, seed_demo_data

@@ -6,6 +6,7 @@ from procurement_agent.erp.faults import (
     ALL_QUOTES_OVER_BUDGET,
     SUPPLIER_B_EXPIRED,
     SUPPLIER_C_NO_QUOTE,
+    SUPPLIER_E_NO_QUOTE,
     FaultRegistry,
 )
 from procurement_agent.erp.repository import ErpRepository
@@ -34,6 +35,15 @@ def test_supplier_c_quote_removed(tmp_path):
     material = repo.find_material_by_name("一次性无菌注射器")
     before = len(repo.list_quotes(material.id))
     faults.set(SUPPLIER_C_NO_QUOTE, True)
+    assert len(repo.list_quotes(material.id)) == before - 1
+
+
+def test_supplier_e_quote_removed(tmp_path):
+    """安泰停报开关：把可用报价再压掉一家，用于演示"只剩一家可用"。"""
+    repo, faults = make_repo(tmp_path)
+    material = repo.find_material_by_name("一次性无菌注射器")
+    before = len(repo.list_quotes(material.id))
+    faults.set(SUPPLIER_E_NO_QUOTE, True)
     assert len(repo.list_quotes(material.id)) == before - 1
 
 

@@ -80,7 +80,15 @@ function renderLeft(detail) {
     ? ""
     : '<tr><td colspan="2" class="hint">尚未解析</td></tr>';
   document.getElementById("structured").innerHTML = structuredHtml;
-  document.getElementById("memory-block").textContent = detail.memory_block || "";
+  // 记忆全文放折叠区，默认只露一行摘要，避免左栏被大段文字占满
+  const memory = detail.memory_block || "";
+  document.getElementById("memory-block").textContent = memory;
+  const firstLine = memory.split("\n")[0] || "";
+  document.getElementById("memory-summary").textContent = memory
+    ? firstLine.length > 44
+      ? firstLine.slice(0, 44) + "…"
+      : firstLine
+    : "本次任务未加载记忆";
 
   document.getElementById("skill-status").innerHTML = [
     ...(detail.loaded_skills || []).map(

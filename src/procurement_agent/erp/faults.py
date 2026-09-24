@@ -10,13 +10,20 @@ from procurement_agent.db.models import FaultFlag
 
 SUPPLIER_B_EXPIRED = "supplier_b_expired"
 SUPPLIER_C_NO_QUOTE = "supplier_c_no_quote"
+SUPPLIER_E_NO_QUOTE = "supplier_e_no_quote"
 ALL_QUOTES_OVER_BUDGET = "all_quotes_over_budget"
 
-ALL_FLAGS = (SUPPLIER_B_EXPIRED, SUPPLIER_C_NO_QUOTE, ALL_QUOTES_OVER_BUDGET)
+ALL_FLAGS = (
+    SUPPLIER_B_EXPIRED,
+    SUPPLIER_C_NO_QUOTE,
+    SUPPLIER_E_NO_QUOTE,
+    ALL_QUOTES_OVER_BUDGET,
+)
 
 FLAG_LABELS = {
     SUPPLIER_B_EXPIRED: "让瑞康医械供应链的经营许可证过期",
     SUPPLIER_C_NO_QUOTE: "让济生医疗科技停止报价",
+    SUPPLIER_E_NO_QUOTE: "让安泰医疗物资停止报价",
     ALL_QUOTES_OVER_BUDGET: "让全部报价涨到三倍",
 }
 

@@ -39,7 +39,8 @@ async def test_eval_endpoints_run_and_report(tmp_path):
         started = await client.post("/api/eval/run")
         assert started.status_code == 200
 
-        for _ in range(120):
+        # 轮询预算给得宽：整包并行跑测试时机器负载高，2 条用例也可能超过 30 秒
+        for _ in range(400):
             report = (await client.get("/api/eval/latest")).json()
             if report["status"] == "finished":
                 break
@@ -55,7 +56,7 @@ async def test_eval_report_persisted_to_disk(tmp_path):
     app = make_offline_app(tmp_path, cases_path=write_small_cases(tmp_path))
     async with await make_client(app) as client:
         await client.post("/api/eval/run")
-        for _ in range(120):
+        for _ in range(400):
             report = (await client.get("/api/eval/latest")).json()
             if report["status"] == "finished":
                 break
