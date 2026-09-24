@@ -3,6 +3,21 @@
 本项目遵循语义化版本。第一版从零到 v1.0.0 的完整过程记录在
 [docs/decision-log.md](docs/decision-log.md)（19 条决策与验证记录），本文件只保留面向使用者的结论。
 
+## v1.0.1（2026-09-24）
+
+### 修复
+
+- **CI 在 Linux 上误报**：`test_child_env_only_contains_allowlist` 断言"子进程环境 ⊆ 白名单"，
+  但 POSIX 下 Python 会做 locale coercion（PEP 538）——父进程没有 `LANG`/`LC_*` 时，
+  解释器启动会把 `LC_CTYPE` 写进自己的环境，子进程于是多出这个变量。Windows 上不会发生，所以本地一直是绿的。
+  已改为断言**真正的安全属性**：用哨兵环境变量（`AGENT_SECRET_CANARY`）验证白名单外的变量不会进子进程，
+  `LC_CTYPE`/`LC_ALL`/`LANG` 显式排除并注明原因。产品代码未变。
+
+### 说明
+
+- 这是本仓库**第一次在真实 runner 上跑 CI**（推送到 GitHub 之前只验证过命令本身能通过）：
+  首跑 ubuntu-latest 结果为 258 通过 / 1 失败，修完即全绿（`ruff` → 259 项测试 → 离线评测三步全过）。
+
 ## v1.0.0（2026-09-24）—— 首个正式版本
 
 ### 系统能力

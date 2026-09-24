@@ -1,5 +1,7 @@
 # 医用耗材采购自动化 Agent 系统
 
+![CI](https://github.com/Hugo-0913/procurement-agent/actions/workflows/ci.yml/badge.svg)
+
 基于 DeepAgents 的多 Agent 采购流程自动化系统：主 Agent 委派三类子 Agent，完成「需求输入 → 资质核验 → 比价分析 → 订单审批 → 订单生成」的完整闭环，并提供本地 Web 界面实时观察委派过程、审批拦截与异常重试。
 
 需求范围见 [PRD.md](PRD.md)，版本说明见 [CHANGELOG.md](CHANGELOG.md)，技术方案见 [docs/architecture.md](docs/architecture.md)，关键决策见 [docs/decision-log.md](docs/decision-log.md)，上手操作见 [docs/operation-guide.md](docs/operation-guide.md)。（[plan.md](plan.md) 是启动时的施工计划，已标注为历史文档。）
