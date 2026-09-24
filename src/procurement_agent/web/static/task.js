@@ -20,6 +20,23 @@ let events = [];
 let lastSeq = 0;
 let started = Date.now();
 
+// 耗时口径：任务结束后停在完成时间上，不再跟着墙钟继续涨。
+// 早期只用 Date.now() - created_at，导致完成的任务一直显示"已耗时"并持续增加。
+const TERMINAL_STATES = new Set(["COMPLETED", "FAILED"]);
+
+function elapsedInfo(detail) {
+  const start = Date.parse(detail.created_at);
+  if (Number.isNaN(start)) return { seconds: 0, finished: false };
+  // 终态优先用 finished_at；老记录缺这个字段时退到 updated_at，避免历史任务永远在涨
+  const endSource =
+    detail.finished_at || (TERMINAL_STATES.has(detail.state) ? detail.updated_at : null);
+  const end = endSource ? Date.parse(endSource) : NaN;
+  if (!Number.isNaN(end)) {
+    return { seconds: Math.max(0, Math.floor((end - start) / 1000)), finished: true };
+  }
+  return { seconds: Math.max(0, Math.floor((Date.now() - start) / 1000)), finished: false };
+}
+
 function renderStageBar(detail) {
   // 等待澄清时视觉上仍停留在"需求解析"这一步
   const effectiveState = detail.state === "AWAITING_CLARIFICATION" ? "PARSING" : detail.state;
@@ -37,7 +54,7 @@ function renderStageBar(detail) {
     return `<span class="${cls}">${stage.label}</span>`;
   }).join('<span class="hint">→</span>');
 
-  const elapsed = Math.floor((Date.now() - Date.parse(detail.created_at)) / 1000);
+  const elapsed = elapsedInfo(detail);
   const badge = STATE_CLASS[detail.state] || "blue";
   const bar = document.getElementById("stage-bar");
   const stages = bar.querySelectorAll(".stage");
@@ -52,7 +69,7 @@ function renderStageBar(detail) {
   bar.querySelectorAll(".arrow").forEach((el) => el.remove());
   document.getElementById("stage-meta").innerHTML =
     `<span class="badge ${badge}">${detail.state_label}</span>
-     <span class="hint">已耗时 ${elapsed}s</span>
+     <span class="hint">${elapsed.finished ? "总耗时" : "已耗时"} ${elapsed.seconds}s</span>
      <span class="hint">token ${(detail.token_usage || {}).total || 0}</span>`;
 }
 

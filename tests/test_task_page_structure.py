@@ -64,3 +64,20 @@ def test_memory_and_skill_details_are_folded_by_default():
         assert "</details>" not in html[details_at:at], f"{target} 必须包在折叠区里"
         open_tag = html[details_at : html.index(">", details_at)]
         assert "open" not in open_tag, f"{target} 所在的折叠区不应默认展开"
+
+
+def test_elapsed_time_stops_after_task_finishes():
+    """任务结束后耗时停在 finished_at 上，不能再跟着墙钟一直涨。
+
+    曾经只用 Date.now() - created_at 计算，完成的任务会显示"已耗时 84761s"并持续增加。
+    """
+    source = (STATIC / "task.js").read_text(encoding="utf-8")
+    assert "function elapsedInfo(" in source, "耗时应集中在一个可测的函数里"
+    assert "detail.finished_at" in source, "耗时必须读完成时间"
+    assert "TERMINAL_STATES" in source and "detail.updated_at" in source, (
+        "终态但缺 finished_at 的历史记录也要停住"
+    )
+    assert "Date.now() - Date.parse(detail.created_at)" not in source, (
+        "不得只按当前时间计算耗时"
+    )
+    assert 'elapsed.finished ? "总耗时" : "已耗时"' in source, "结束后应改称总耗时"
