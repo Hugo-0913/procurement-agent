@@ -3,21 +3,30 @@ name = "procurement-agent"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-  "deepagents",
-  "langgraph",
-  "langgraph-checkpoint-sqlite",
-  "langchain-deepseek",
-  "fastapi",
-  "uvicorn[standard]",
-  "sqlalchemy>=2.0",
-  "pydantic>=2",
-  "pydantic-settings",
-  "pyyaml",
-  "jinja2",
+  # 直接依赖都给了上下界：本项目是按这批版本的 API 写的
+  # （例如 deepagents 的 create_deep_agent 签名、langgraph 的 checkpointer 行为），
+  # 不设边界时"明天重新装一次"可能就装到不兼容的新版本。
+  # 精确版本另见 requirements.lock.txt（实测可用的一整套）。
+  "deepagents>=0.7.15,<0.8",
+  "langgraph>=1.2.11,<1.3",
+  "langgraph-checkpoint-sqlite>=3.1.1,<4",
+  "langchain-deepseek>=1.1.0,<1.2",
+  "fastapi>=0.141.1,<0.142",
+  "uvicorn[standard]>=0.53,<0.54",
+  "sqlalchemy>=2.0.54,<2.1",
+  "pydantic>=2.13.5,<2.14",
+  "pydantic-settings>=2.15,<2.16",
+  "pyyaml>=6.0.3,<6.1",
+  "jinja2>=3.1.6,<3.2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "httpx", "ruff"]
+dev = [
+  "pytest>=9.1,<9.2",
+  "pytest-asyncio>=1.4,<1.5",
+  "httpx>=0.28,<0.29",
+  "ruff>=0.16,<0.17",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -2,7 +2,7 @@
 
 基于 DeepAgents 的多 Agent 采购流程自动化系统：主 Agent 委派三类子 Agent，完成「需求输入 → 资质核验 → 比价分析 → 订单审批 → 订单生成」的完整闭环，并提供本地 Web 界面实时观察委派过程、审批拦截与异常重试。
 
-需求范围见 [PRD.md](PRD.md)，实施计划见 [plan.md](plan.md)，技术方案见 [docs/architecture.md](docs/architecture.md)，关键决策见 [docs/decision-log.md](docs/decision-log.md)。
+需求范围见 [PRD.md](PRD.md)，版本说明见 [CHANGELOG.md](CHANGELOG.md)，技术方案见 [docs/architecture.md](docs/architecture.md)，关键决策见 [docs/decision-log.md](docs/decision-log.md)，上手操作见 [docs/operation-guide.md](docs/operation-guide.md)。（[plan.md](plan.md) 是启动时的施工计划，已标注为历史文档。）
 
 ## 架构
 
@@ -26,9 +26,10 @@ flowchart TD
 ## 快速开始
 
 ```bash
-# 1. 创建虚拟环境并安装依赖
+# 1. 创建虚拟环境并安装依赖（按锁定文件装，保证和别人装出同一套）
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+.venv\Scripts\python.exe -m pip install -e . --no-deps
 
 # 2. 配置模型（真实运行时需要）
 copy .env.example .env
@@ -39,6 +40,10 @@ copy .env.example .env
 ```
 
 打开 http://127.0.0.1:8000 即可看到任务看板页。
+
+`requirements.lock.txt` 是实测可用的整套依赖（85 个间接依赖也在内）；`pyproject.toml` 里给直接依赖
+定了上下界，两者需要同时更新。依赖版本不是可有可无的细节：本项目按 deepagents 0.7.15 的
+`create_deep_agent` 签名与 langgraph 1.2.x 的检查点行为编写，装到不兼容的新版本会在 Agent 装配阶段直接失败。
 
 **模型模式是自动判断的**：未配置 `DEEPSEEK_API_KEY` 时，应用会自动切换到内置离线解析器（正则规则，不联网），
 页面顶部显示橙色"离线演示模式"横幅，全流程仍可完整跑通（不联网）。配置 key 后重启即用真实
@@ -129,10 +134,14 @@ gh repo create procurement-agent --private --source=. --remote=origin --push
 
 ```bash
 git remote add origin <你的仓库地址>
-git push -u origin main
+git push -u origin main --tags
 ```
 
 注意 `.env` 已在 `.gitignore` 中，密钥不会被推送；推送前可以用 `git status --porcelain` 确认工作区干净。
+推上去之后到仓库的 **Actions** 标签页确认 CI 跑绿——`ruff` + 259 项测试 + 离线评测三步都在工作流里。
+
+`v1.0.0` 标签已经打在最终提交上。要归档发布版本，除了标签，也可以在 GitHub 仓库页面用
+**Settings → Archive this repository** 把仓库置为只读存档。
 
 **口径说明（重要）：**
 
